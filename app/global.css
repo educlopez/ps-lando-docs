@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+@theme {
+  --color-brand-50: oklch(0.98 0.02 65);
+  --color-brand-100: oklch(0.95 0.05 65);
+  --color-brand-200: oklch(0.9 0.1 65);
+  --color-brand-300: oklch(0.83 0.15 60);
+  --color-brand-400: oklch(0.75 0.18 50);
+  --color-brand-500: oklch(0.69 0.2 45);
+  --color-brand-600: oklch(0.62 0.22 40);
+  --color-brand-700: oklch(0.54 0.21 38);
+  --color-brand-800: oklch(0.46 0.18 36);
+  --color-brand-900: oklch(0.38 0.15 35);
+
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, monospace;
+}
+
+:root {
+  --color-fd-primary: oklch(0.69 0.2 45);
+  --color-fd-accent: oklch(0.69 0.2 45 / 0.12);
+}
+
+.dark {
+  --color-fd-primary: oklch(0.83 0.15 60);
+  --color-fd-accent: oklch(0.83 0.15 60 / 0.16);
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+/* Hero gradient (subtle warm glow, brand-tinted) */
+.hero-glow {
+  background:
+    radial-gradient(
+      circle at 30% 20%,
+      oklch(0.7 0.2 45 / 0.18) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 70% 80%,
+      oklch(0.7 0.18 30 / 0.12) 0%,
+      transparent 60%
+    );
+}

@@ -1,0 +1,102 @@
+---
+title: Quickstart
+description: Spin up your first PrestaShop sandbox in 5 minutes.
+---
+
+This guide gets you from zero to a fully working PrestaShop sandbox with Panda installed in about 5 minutes (most of it waiting for downloads).
+
+## Prerequisites
+
+- **Docker Desktop** (or OrbStack, but Docker Desktop is best supported).
+- **Lando 3.x** — `brew install --cask lando` on macOS.
+- **Node 20+** to run `npx`.
+- The **Panda theme zip** from your SunnyToo account.
+
+That's it. You don't need a global `prestashop` install, you don't need Composer, you don't need PHP locally.
+
+## 1. Drop your zips in a folder
+
+Create a project directory and put your Panda zip there:
+
+```bash
+mkdir my-shop && cd my-shop
+cp ~/Downloads/panda-theme.zip .
+```
+
+Optional but recommended:
+
+```bash
+cp ~/Downloads/steasybuilder.zip .
+cp ~/Downloads/steasy_trans_panda.zip .   # the bridge — needed if you have Easy Builder
+```
+
+`ps-lando` auto-detects any of these names: `panda*.zip`, `steasybuilder*.zip`, `steasy_trans_panda*.zip`.
+
+## 2. Run create
+
+```bash
+npx ps-lando@latest create
+```
+
+You'll get a few prompts:
+
+- **PrestaShop version** — pick the latest (currently 9.1.0). The list comes from the live `prestashop-versions.json` manifest, so you always see what's available.
+- **Project name** — defaults to the current folder name. This becomes the Lando app name + the `.lndo.site` domain.
+- **PHP version** — auto-suggested based on the PS version you picked. You can override.
+- **Modules to install** — by default all 56. Pick "Custom" to deselect groups (blog, easybuilder, social, marketing).
+- **Recipes** — optional bundled scripts to run after install. Demo data, ES taxes, etc. See [Recipes catalog](/docs/reference/recipes-catalog).
+
+If you want to skip the wizard:
+
+```bash
+npx ps-lando@latest create -y --ps-version 9.1.0
+```
+
+## 3. What happens during create
+
+```
+1. Download PrestaShop from the official CDN (~117 MB, ~30 s).
+2. Extract — outer ZIP → inner prestashop.zip → site root.
+3. Run lando start to bring up Apache + MariaDB + phpMyAdmin + MailHog.
+4. Run the PrestaShop CLI installer (php install/index_cli.php).
+5. Extract the Panda theme zip → copy 54 st* modules to modules/.
+6. (Optional) Extract steasybuilder + steasy_trans_panda.
+7. Activate the Panda theme.
+8. Install all modules in parallel batches (concurrency 3).
+9. Run any selected recipes (init phase) and hooks (init-scripts/).
+10. Smoke test the front-end.
+11. Run any post-phase recipes/hooks.
+```
+
+Total: ~6 min for the first run on a clean machine, ~5 min once Docker has the images cached.
+
+## 4. Open the back-office
+
+When `create` finishes, you'll see a summary box:
+
+```
+✔ Sandbox lista
+  Front:    http://my-shop.lndo.site/
+  Admin:    http://my-shop.lndo.site/admin8a3kls9d/   ← randomized by PS
+  Modules:  55/56 active, 1 installed-but-inactive: stupgrader
+  PS:       9.1.0
+  Theme:    panda
+```
+
+Open the back-office URL and log in with `admin@example.com` / `sandbox1234` (the defaults — override via flags or the wizard).
+
+```bash
+npx ps-lando open bo
+```
+
+## What about stupgrader?
+
+`stupgrader` consistently reports as "installed but not active" on PS 9.x. It's a known PrestaShop module-install quirk — the install command exits 0, but the module never flips `active=1` in `ps_module`. Not a `ps-lando` bug; the module isn't critical for your day-to-day. We document it explicitly so the count discrepancy doesn't confuse you.
+
+## Next steps
+
+<Cards>
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="Skip groups or cherry-pick modules with --skip-* and --only flags." />
+  <Card title="Recipes" href="/docs/guides/hooks-and-recipes" description="Demo data, ES taxes, cache warmup — bundled scripts ready to run." />
+  <Card title="Sandbox lifecycle" href="/docs/guides/sandbox-lifecycle" description="db reset, dump, restore — iterate fast without re-creating from scratch." />
+</Cards>

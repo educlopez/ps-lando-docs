@@ -1,0 +1,42 @@
+---
+title: Welcome
+description: ps-lando spins up a full PrestaShop + Panda + Easy Builder sandbox in one command.
+---
+
+`ps-lando` is a CLI for local PrestaShop development. It wraps Lando (which wraps Docker) and adds the pieces a [Panda](https://addons.prestashop.com/) developer actually needs:
+
+- Downloads PrestaShop from the official CDN (PS 9.x) or GitHub Releases (PS 8.x).
+- Extracts the Panda theme zip and copies all `st*` modules.
+- Runs the PrestaShop CLI installer with sensible defaults.
+- Installs every Panda module in dependency-aware parallel batches.
+- Optionally runs hook scripts and bundled recipes.
+- Provides full sandbox lifecycle commands: `db reset`, `db dump`, `db restore`, `doctor`.
+
+If you've ever spent an afternoon installing PrestaShop, dragging zips, configuring Lando, and re-installing modules one by one — `ps-lando` is for you.
+
+## Get started
+
+<Cards>
+  <Card title="Quickstart" href="/docs/getting-started/quickstart" description="Spin up your first sandbox in 5 minutes." />
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="Install only what your client needs — skip blog, Easy Builder, or cherry-pick by name." />
+  <Card title="Recipes" href="/docs/guides/hooks-and-recipes" description="6 bundled recipes for demo data, ES taxes, cache warmup, and more." />
+  <Card title="Sandbox lifecycle" href="/docs/guides/sandbox-lifecycle" description="Reset, dump, restore, and diagnose — keep your sandbox healthy." />
+</Cards>
+
+## Compatibility
+
+`ps-lando` is validated against:
+
+- **PrestaShop 8.2.x** — via GitHub Releases zip.
+- **PrestaShop 9.0.x** — via the official CDN (expected OK; not directly tested).
+- **PrestaShop 9.1.x** — via the official CDN.
+
+Both branches with **Panda theme + Easy Builder + 56 `st*` modules**.
+
+See the [Compatibility matrix](/docs/reference/compatibility-matrix) for the full breakdown.
+
+## Why ps-lando exists
+
+PrestaShop's docs assume you'll click through a wizard, drop zips by hand, and click "install" on each module in the back-office. That's fine for a one-off install. It is not fine when you start a new client project every couple of weeks, each with its own variant of the Panda theme.
+
+`ps-lando` exists so the boring parts of that loop disappear. You drop your zips, run one command, and start working on what matters — the actual customisation for your client.
