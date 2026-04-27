@@ -11,7 +11,15 @@ import { SchemaIllustration } from '@/components/schema-illustration';
 import { StatsCard } from '@/components/stats-card';
 import { GradientPlate } from '@/components/gradient-plate';
 import { AnimateText, Reveal } from '@/components/animate-text';
-import { githubUrl } from '@/lib/shared';
+import {
+  appName,
+  author,
+  description,
+  githubUrl,
+  npmUrl,
+  siteUrl,
+  tagline,
+} from '@/lib/shared';
 import { abstractImages } from '@/lib/images';
 import { getDict, type Dict } from '@/lib/i18n/dict';
 import type { Locale } from '@/lib/i18n';
@@ -24,6 +32,7 @@ export default async function HomePage(props: PageProps<'/[lang]'>) {
 
   return (
     <>
+      <StructuredData locale={locale} />
       <Hero t={t} docsBase={docsBase} />
       <FeaturesCarousel t={t} />
       <LlmSection t={t} />
@@ -43,6 +52,64 @@ export default async function HomePage(props: PageProps<'/[lang]'>) {
       <QuoteSection t={t} />
       <FinalCTA t={t} docsBase={docsBase} />
       <Footer t={t} docsBase={docsBase} />
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Structured data (JSON-LD)                                                  */
+/* -------------------------------------------------------------------------- */
+
+function StructuredData({ locale }: { locale: Locale }) {
+  const homeUrl = locale === 'en' ? siteUrl : `${siteUrl}/${locale}`;
+  const inLanguage = locale === 'en' ? 'en-US' : 'es-ES';
+
+  const softwareApplication = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: appName,
+    description,
+    url: siteUrl,
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'macOS, Linux, Windows',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    softwareVersion: '0.6.0',
+    downloadUrl: npmUrl,
+    codeRepository: githubUrl,
+    license: 'https://opensource.org/licenses/MIT',
+    author: {
+      '@type': 'Person',
+      name: author,
+      url: 'https://github.com/educlopez',
+    },
+    keywords: 'PrestaShop, Lando, sandbox, CLI, local development, modules, recipes',
+  };
+
+  const website = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: `${appName} — ${tagline}`,
+    url: homeUrl,
+    inLanguage,
+    publisher: {
+      '@type': 'Person',
+      name: author,
+      url: 'https://github.com/educlopez',
+    },
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD payload, no user input.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplication) }}
+      />
+      <script
+        type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD payload, no user input.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(website) }}
+      />
     </>
   );
 }

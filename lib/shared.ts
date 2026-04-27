@@ -2,6 +2,28 @@ export const appName = 'ps-lando';
 export const tagline = 'Local PrestaShop sandboxes in 6 minutes';
 export const description =
   'Spin up local PrestaShop 8 & 9 sandboxes in 6 minutes with ps-lando — a Lando-based CLI. Hooks, recipes, db reset/dump/restore, theme + modules ready.';
+export const author = 'Eduardo Calvo';
+export const twitterHandle = '@educlopez';
+export const keywords = [
+  'ps-lando',
+  'PrestaShop',
+  'PrestaShop 8',
+  'PrestaShop 9',
+  'Lando',
+  'local development',
+  'sandbox',
+  'CLI',
+  'Docker',
+  'PrestaShop modules',
+  'PrestaShop themes',
+  'developer tools',
+  'PrestaShop developer',
+  'database reset',
+  'recipes',
+] as const;
+
+export const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ps-lando-docs.vercel.app';
 
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';

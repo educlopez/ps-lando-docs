@@ -18,7 +18,9 @@ const LOCALE_COOKIE = 'FD_LOCALE';
 
 /**
  * Paths that should NOT go through the i18n middleware.
- * These are locale-agnostic API / asset routes.
+ * These are locale-agnostic API / asset routes, including Next.js
+ * metadata file conventions (manifest, opengraph-image, etc.) which
+ * must resolve at the root, not under /[lang]/.
  */
 const I18N_BYPASS_PREFIXES = [
   '/api/',
@@ -28,6 +30,13 @@ const I18N_BYPASS_PREFIXES = [
   '/og/',
   '/_next/',
   '/favicon',
+  '/icon',
+  '/apple-icon',
+  '/opengraph-image',
+  '/twitter-image',
+  '/manifest.webmanifest',
+  '/sitemap.xml',
+  '/robots.txt',
 ];
 
 /**
