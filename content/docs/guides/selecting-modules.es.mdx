@@ -1,0 +1,116 @@
+---
+title: Selección de módulos
+description: Omite grupos o elige módulos `st*` de Panda individualmente al ejecutar create o install-modules.
+---
+
+Desde **0.5.0**, `create` e `install-modules` pueden instalar un subconjunto de los módulos `st*` de Panda en lugar del set completo. Útil cuando el cliente no tiene blog, no usa Easy Builder, o cuando reproduces un bug con solo 2-3 módulos.
+
+## Por qué selección granular
+
+`ps-lando` viene con un valor por defecto razonable — instala todo lo que Panda incluye más Easy Builder si los zips están presentes. Es la decisión correcta para el primer sandbox de un proyecto. Pero:
+
+- No todos los clientes tienen blog → `--skip-blog` quita 11 módulos y ~30 s de tiempo de install.
+- No todos los clientes tienen Easy Builder → omite los zips, o `--skip-easybuilder` si están por ahí.
+- Reproduces un bug de un único módulo → `--only stbanner` instala solo ese módulo en un sandbox limpio.
+- Core mínimo pelado → combina todos los flags `--skip-*`.
+
+## Las cuentas de los módulos
+
+`ps-lando` copia e instala los módulos `st*` incluidos en tu zip de Panda (típicamente **54**) más `steasybuilder` + `steasy_trans_panda` cuando esos zips están presentes en la carpeta del proyecto (**+2 = 56 totales**). Los módulos `stats*` que vienen con PS no se tocan nunca.
+
+La cuenta final exacta depende de tu selección.
+
+## Grupos
+
+Cada grupo es una lista hardcodeada de módulos que puedes excluir con un solo flag:
+
+| Grupo | Flag | Módulos | Cuenta |
+|---|---|---|---|
+| `blog` | `--skip-blog` | `stblog`, `stblogarchives`, `stblogblockcategory`, `stblogcomments`, `stblogeditor`, `stblogfeaturedarticles`, `stbloglinknav`, `stblogrecentarticles`, `stblogrelatedarticles`, `stblogsearch`, `stblogtags` | **11** |
+| `easybuilder` | `--skip-easybuilder` | `steasybuilder`, `steasy_trans_panda` | **2** |
+| `social` | `--skip-social` | `stsocial`, `stfblikebox`, `stinstagram`, `sttwitterembeddedtimelines` | **4** |
+| `marketing` | `--skip-marketing` | `stcountdown`, `stnewsletter`, `stnotification`, `ststickers` | **4** |
+
+Los grupos se combinan. Saltarte `blog` + `easybuilder` quita 13 módulos; saltarte los cuatro quita 21.
+
+<Callout type="info">
+`--skip-easybuilder` también impide que los archivos `steasybuilder.zip` + `steasy_trans_panda.zip` se copien a `modules/`. Avisa explícitamente cuando esos zips están presentes en el cwd pero el flag está activo.
+</Callout>
+
+## Flags individuales
+
+- `--skip <list>` — nombres de módulos separados por coma para omitir individualmente, p. ej. `--skip stbanner,stinstagram`. Los nombres desconocidos loguean un warning y siguen.
+- `--only <list>` — instala **solo** los módulos listados, p. ej. `--only stmegamenu,stbanner`. Los nombres desconocidos dan error.
+
+<Callout type="warn">
+`--only` es mutuamente excluyente con cualquier forma `--skip-*`. Combinarlos termina con código 2.
+</Callout>
+
+## Filtrar install vs. filtrar copia
+
+Por defecto, `--skip-*` / `--only` solo filtran lo que se **instala** — cada módulo `st*` del zip de Panda igual se **copia** a `modules/`, así que puedes re-ejecutar `ps-lando install-modules` después (sin flags) para coger los módulos que originalmente omitiste.
+
+Pasa `--no-copy-skipped` (añadido en 0.5.2) junto a cualquier flag `--skip-*` / `--only` para saltarte también el paso de copia — `modules/` queda limpio. El log de `deployPanda` refleja la cuenta filtrada: `"Copying 43 of 54 Panda st* modules — 11 skipped via --no-copy-skipped"`.
+
+`--no-copy-skipped` no hace nada cuando se usa sin un flag `--skip-*` / `--only`.
+
+## Combos habituales
+
+```bash
+# Tienda que no necesita blog (45 módulos + Easy Builder = 47).
+ps-lando create -y --skip-blog
+
+# Sin Easy Builder (54 módulos st* de Panda — avisa si los zips de EB están en cwd).
+ps-lando create -y --skip-easybuilder
+
+# Core mínimo: sin blog, sin EB, sin social, sin marketing.
+ps-lando create -y --skip-blog --skip-easybuilder --skip-social --skip-marketing
+
+# Depurando solo 2 módulos en un sandbox existente.
+ps-lando install-modules --only stmegamenu,stbanner
+
+# Install completo excepto dos módulos que no te gustan.
+ps-lando install-modules --skip stqrcode,sttags
+
+# Saltar blog Y ni siquiera copiar los módulos de blog a modules/.
+ps-lando create -y --skip-blog --no-copy-skipped
+```
+
+## Modo interactivo
+
+Cuando ejecutas `ps-lando create` sin `-y` y sin ningún flag `--skip-*` / `--only`, aparece un multiselect después del paso de locale:
+
+```
+? What modules to install?
+  ❯ All modules   (default, backwards-compat)
+    Core only     (skips blog, easybuilder, social, marketing)
+    Custom...     (second prompt: which groups to include)
+```
+
+El comportamiento pre-0.5.0 es el por defecto, así que los scripts existentes que pasan `-y` siguen instalando todo — sin breaking change.
+
+## Persistencia en `.ps-lando.json`
+
+La selección que hiciste en `create` se persiste en `.ps-lando.json` bajo `module_selection`:
+
+```json
+{
+  "module_selection": {
+    "skipGroups": ["blog"],
+    "skipModules": [],
+    "only": null,
+    "noCopySkipped": false
+  }
+}
+```
+
+Esto significa que [`ps-lando db reset`](/docs/guides/sandbox-lifecycle) re-aplica el mismo filtrado al reinstalar módulos — no tienes que recordar qué flags usaste la primera vez.
+
+Los sandboxes creados antes de 0.6.0 (sin el campo) tiran de "instalar todo" en reset por defecto.
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Hooks y recipes" href="/docs/guides/hooks-and-recipes" description="Automatiza personalizaciones por proyecto después del install." />
+  <Card title="Referencia de flags" href="/docs/reference/flags" description="Lista completa de flags de create + install-modules." />
+</Cards>

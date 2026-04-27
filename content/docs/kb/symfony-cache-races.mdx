@@ -1,0 +1,104 @@
+---
+title: Symfony admin-container cache races
+description: Parallel module installs can collide on Symfony's container cache — how ps-lando detects and recovers.
+---
+
+Discovered while validating v0.4.2 with parallel module installs. Two concurrent `prestashop:module install` invocations can collide rewriting the admin-container cache, producing one of two error variants. `ps-lando` detects both and retries.
+
+## The problem
+
+When `ps-lando install-modules` runs with the default concurrency 3, several module installs happen simultaneously inside the appserver container. Each install triggers Symfony to rebuild the admin container cache (because installing a module registers new services / commands). Two workers writing to the same cache files at the same time can step on each other.
+
+Two reproducible variants:
+
+## Variant A — Filesystem rename mid-write
+
+```
+In Filesystem.php line 320:
+Cannot rename "/app/var/cache/prod/ContainerXxx/Foo.php<tmp>" to
+"/app/var/cache/prod/ContainerXxx/Foo.php": rename(...): No such file or directory
+```
+
+**Cause**: worker 1 wrote `Foo.php<tmp>` and is about to atomic-rename it to `Foo.php`. Worker 2 deletes or rewrites the tmp file before worker 1's rename runs. Worker 1's rename fails with "no such file or directory".
+
+## Variant B — Failed to open stream + kernel doesn't boot
+
+```
+Warning: require(/app/var/cache/prod/ContainerXxx/Foo.php):
+  Failed to open stream: No such file or directory
+[...]
+Command "prestashop:module" is not defined
+```
+
+**Cause**: worker 2's kernel tries to boot by `require`-ing a `.php` file that worker 1 is still mid-write. The require fails, Symfony doesn't register the PrestaShop commands, and the CLI silently loses `prestashop:module`. The follow-up command on that worker reports the command as undefined.
+
+## Mitigation in `ps-lando`
+
+### v0.4.2 — detect + retry once
+
+- `isSymfonyCacheRaceError()` in `src/commands/install-modules.ts` detects both variants by string-matching `stdout`/`stderr`.
+- On detection, `installOneModule` retries the failing module **once** after the sibling installs have drained.
+- Forensics for both attempts are appended to `.ps-lando-install.log` (timestamps, attempt number, outcome).
+
+Empirically one retry was usually enough, because by the time the retry kicks in the parallel siblings have finished their cache rebuild and stopped contending.
+
+### v0.5.1 — 3 retries with exponential backoff
+
+v0.5.0 smoke tests showed cases where a module (typically `stbanner`) lost the race **twice in a row** — the single retry shipped in 0.4.2 wasn't enough to outlast a sibling cache rebuild that was still in flight. v0.5.1 retries up to **3 times with growing delays**:
+
+| Attempt | Delay before |
+|---|---|
+| 1 | 0 ms (initial) |
+| 2 | 500 ms |
+| 3 | 1500 ms |
+| 4 | 3000 ms |
+
+Total budget: ~5 s in the worst case. In practice attempt 2 or 3 wins almost always.
+
+Per-attempt forensics in `.ps-lando-install.log`:
+
+```
+[2026-04-25 14:32:12] stbanner — install attempt 1/4 — FAILED (Symfony cache race A)
+[2026-04-25 14:32:12] stbanner — retry attempt 2/4 delayMs=500
+[2026-04-25 14:32:13] stbanner — install attempt 2/4 — FAILED (Symfony cache race A)
+[2026-04-25 14:32:13] stbanner — retry attempt 3/4 delayMs=1500
+[2026-04-25 14:32:15] stbanner — install attempt 3/4 — OK
+```
+
+### Early-exit on non-race failures
+
+If a retry fails with an error that **isn't** a cache race (e.g. a missing dependency, a syntax error in the module's PHP), the loop exits early instead of burning the rest of the retry budget on a deterministic failure.
+
+### HTMLPurifier retry stays at 1
+
+The HTMLPurifier cache-dir bug also has retry logic, but it stays at **1 attempt** because the fix is deterministic and instant — create the missing dir and retry. No backoff needed. See [HTMLPurifier cache bug](/docs/kb/htmlpurifier-cache-bug).
+
+## Exported helpers (for tests)
+
+```ts
+import {
+  isSymfonyCacheRaceError,
+  SYMFONY_RACE_MAX_RETRIES,
+  SYMFONY_RACE_BACKOFFS_MS,
+} from "ps-lando/src/commands/install-modules";
+```
+
+These are exported so `tests/install-modules.test.ts` can verify the detection matrix and the backoff sequence.
+
+## Implications for the future
+
+- **Bumping `MAX_CONCURRENT` above 3** requires re-validation on real sandboxes — collision rate isn't linear with concurrency.
+- **If Panda (or other module distributions) declare `<dependencies>` in `config.xml`**, the topological sort already in `src/lib/module-deps.ts` will divide installs into dependency levels naturally — fewer races by design.
+- **The same class of race can appear in any tool that runs `bin/console` Symfony commands in parallel** — migrations, cache clears, fixture imports. The pattern is general: any Symfony command that touches the container cache without an external lock.
+
+## What ps-lando doesn't do (yet)
+
+- **No external lock** — we rely on detection + retry rather than a lock around `prestashop:module install`. A lock would serialise that step and erase the parallelism benefit.
+- **No cache-rebuild pre-warm** — a single `cache:clear --no-warmup` followed by a `cache:warmup` before parallel installs could avoid the rebuild-during-install entirely. Considered, not implemented.
+
+## Related
+
+<Cards>
+  <Card title="Schema drift PS 8.x → 9.x" href="/docs/kb/schema-drift-ps-8-9" description="Other PS-side quirks ps-lando works around." />
+  <Card title="HTMLPurifier cache bug" href="/docs/kb/htmlpurifier-cache-bug" description="The other parallel-install gotcha." />
+</Cards>

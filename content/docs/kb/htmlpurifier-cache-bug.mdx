@@ -1,0 +1,119 @@
+---
+title: HTMLPurifier cache dir bug
+description: PS 8.2.x AND PS 9.1.x ship without the purifier cache dirs — modules using HTMLPurifier fail to install. ps-lando creates them automatically.
+---
+
+Discovered initially in PS 8.2.5 during recipe validation (v0.4.1). In the v0.6.0 smoke run on PS 9.1.0, `ps-lando doctor` detected that the same directories also fail to exist on PS 9.1.x — contrary to the original assumption that this was a PS 8 only bug.
+
+## Symptom
+
+Modules that use `HTMLPurifier` for rich-text input fields in the back-office fail to install with:
+
+```
+User Warning: Base directory /app/var/cache/prod/purifier does not
+  exist, please create or change using %Cache.SerializerPath
+```
+
+The PrestaShop CLI installer doesn't create the purifier cache directories, but PrestaShop expects them to exist when any module that uses HTMLPurifier (e.g. for rich-text product descriptions, banner content, slider captions) is installed.
+
+## Affected modules (known)
+
+- `stbanner` — uses HTMLPurifier for the banner content field.
+- `stswiper` — uses HTMLPurifier for slide content.
+
+Any module with HTML rich-text fields can run into this — these are just the two reliably-reproducible ones from the Panda bundle.
+
+## Affected versions
+
+- **PS 8.2.x** — confirmed on PS 8.2.5 during v0.4.1 validation.
+- **PS 9.1.x** — confirmed on PS 9.1.0 during v0.6.0 doctor smoke. The PS 9 CLI installer also doesn't create these dirs.
+
+PS 9.0.x is "expected affected" by extension (same installer code path).
+
+## What's actually missing
+
+Two directories under the appserver's PrestaShop root:
+
+```
+/app/var/cache/prod/purifier/
+/app/var/cache/dev/purifier/
+```
+
+Both need to exist with `www-data` ownership for HTMLPurifier to write its serializer cache.
+
+## Mitigation in `ps-lando`
+
+### Since v0.4.1 — auto-create on install
+
+`runPrestashopCliInstall` (in `src/lib/prestashop.ts`) always runs after the CLI installer:
+
+```bash
+mkdir -p /app/var/cache/prod/purifier /app/var/cache/dev/purifier
+chown -R www-data:www-data /app/var/cache/prod/purifier /app/var/cache/dev/purifier
+```
+
+Idempotent and applied unconditionally — no-op on the (rare) case where the dirs already exist. No-op on PS 9 if PS ever fixes the bug; safe to leave on indefinitely.
+
+### Since v0.4.2 — auto-retry during batch install
+
+For sandboxes that were created with an older `ps-lando` (no auto-creation), `install-modules` catches the `Cache.SerializerPath` error during the batch install:
+
+- Detected via `isPurifierCacheError()` (string-match on stdout/stderr).
+- The CLI runs the same `mkdir -p` + `chown` fix.
+- The failing module is retried **once**.
+- Both attempts logged to `.ps-lando-install.log`.
+
+The retry counts as success in the summary if it works.
+
+### Since v0.6.0 — doctor checks + fixes
+
+[`ps-lando doctor`](/docs/guides/doctor) checks that both dirs exist. If they don't, ✗ is reported with a fix suggestion. `ps-lando doctor --fix` creates them — this is a non-destructive fix, so it defaults to Yes in the interactive prompt.
+
+This means:
+
+- New sandboxes (v0.4.1+) → dirs created at install time, no error.
+- Pre-v0.4.1 sandboxes or sandboxes created without ps-lando → fixable retroactively with `ps-lando doctor --fix`.
+
+## Why doesn't HTMLPurifier just create the dir?
+
+It tries to use a directory configured by `%Cache.SerializerPath` and asserts existence in its bootstrap. The library's design choice is to fail loud rather than silently create directories with potentially wrong permissions. PrestaShop's CLI installer is supposed to set up that directory tree — but it skips this specific subtree on the affected versions.
+
+## Workaround when not using ps-lando
+
+If you hit this on a sandbox built without `ps-lando`:
+
+```bash
+lando ssh -s appserver -c \
+  'mkdir -p /app/var/cache/prod/purifier /app/var/cache/dev/purifier &&
+   chown -R www-data:www-data /app/var/cache/prod/purifier /app/var/cache/dev/purifier'
+```
+
+Then retry the failing module install:
+
+```bash
+lando ssh -c "php bin/console prestashop:module install stbanner"
+```
+
+## Detection helper (exported for tests)
+
+```ts
+import { isPurifierCacheError } from "ps-lando/src/commands/install-modules";
+
+isPurifierCacheError(stderr); // true if the error matches
+```
+
+The matcher is a substring check on `Cache.SerializerPath` plus a few PS-specific phrasings. Used by both `install-modules` retry logic and `doctor`.
+
+## When does this go away?
+
+If PrestaShop publishes a fix in a future 9.x.x where the CLI installer creates `var/cache/{prod,dev}/purifier/` itself, the `ps-lando` mitigation becomes a redundant no-op (still safe to keep — `mkdir -p` on an existing dir does nothing).
+
+Until then, assume the bug is present in every PrestaShop version we test.
+
+## Related
+
+<Cards>
+  <Card title="Doctor" href="/docs/guides/doctor" description="The diagnostic that flags this issue post-hoc." />
+  <Card title="Schema drift PS 8.x → 9.x" href="/docs/kb/schema-drift-ps-8-9" description="Other PS-side quirks ps-lando works around." />
+  <Card title="Symfony cache races" href="/docs/kb/symfony-cache-races" description="The other parallel-install gotcha." />
+</Cards>

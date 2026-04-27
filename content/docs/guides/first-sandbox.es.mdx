@@ -1,0 +1,195 @@
+---
+title: Tu primer sandbox
+description: Recorrido guiado por el asistente create — cada prompt explicado.
+---
+
+Si nunca has ejecutado `ps-lando create`, esta guía te lleva por el asistente interactivo prompt a prompt para que sepas exactamente qué hace cada elección.
+
+## Antes de empezar
+
+Deberías tener:
+
+- Docker Desktop arrancado.
+- Lando 3.x instalado.
+- Una carpeta con tu `panda.zip` (y opcionalmente `steasybuilder.zip` + `steasy_trans_panda.zip`).
+
+Si algo de eso no está listo, mira [Instalación](/docs/getting-started/installation) primero.
+
+## Ejecuta create
+
+```bash
+mkdir my-shop && cd my-shop
+cp ~/Downloads/panda*.zip .
+cp ~/Downloads/steasy*.zip .          # opcional
+npx ps-lando@latest create
+```
+
+## Los prompts
+
+### 1. Versión de PrestaShop
+
+```
+? Pick a PrestaShop version
+  ❯ 9.1.0   (latest stable)
+    9.0.3
+    9.0.2
+    8.2.5
+    8.2.4
+    ...
+```
+
+La lista viene del manifest oficial [`prestashop-flashlight`](https://github.com/PrestaShop/prestashop-flashlight) (cacheado 24 h, con fallback offline). Las nuevas releases de PS aparecen sin necesidad de actualizar `ps-lando`.
+
+- **9.x** → descargado desde `assets.prestashop3.com` como edición pre-construida (vendor/, assets compilados, ~55 módulos incluidos). Rápido.
+- **8.x** → descargado desde GitHub Releases.
+
+### 2. Nombre del proyecto
+
+```
+? Project name (default: my-shop)
+```
+
+Por defecto el nombre de la carpeta actual. Esto se convierte en:
+
+- El nombre de la app de Lando (`name:` en `.lando.yml`).
+- El hostname: `<project>.lndo.site`.
+- El campo `project` en `.ps-lando.json`.
+
+Casi siempre puedes aceptar el valor por defecto.
+
+### 3. Versión de PHP
+
+```
+? PHP version (recommended for PS 9.1.x: 8.2)
+  ❯ 8.2
+    8.1
+    8.3
+```
+
+Sugerida automáticamente según la rama de PrestaShop que has elegido. PS 9 necesita 8.1+. PS 8 funciona con 7.4+ pero la CLI usa por defecto 8.1 / 8.2.
+
+Si eliges una PHP que difiere de la recomendación de flashlight para la rama de PS elegida, el asistente pregunta una vez antes de escribir `.lando.yml`.
+
+### 4. Base de datos, phpMyAdmin, MailHog
+
+Por defecto: MySQL + phpMyAdmin + MailHog todos activados. Recomendado salvo que tengas una razón concreta para quitar alguno.
+
+### 5. Tema Panda
+
+```
+? Install Panda theme? (Y/n)
+```
+
+Auto-detectado: si hay un `panda*.zip` en la carpeta, el valor por defecto es Sí. Si no, el valor por defecto es No (te quedas con un sandbox de PrestaShop pelado).
+
+### 6. Tema hijo
+
+```
+? Create child theme? (Y/n)
+```
+
+**Di siempre Sí.** Un tema hijo (`themes/<project>_child/`) es donde viven tus personalizaciones. Editar el padre `themes/panda/` directamente se borra al actualizar Panda. Mira [convención de tema hijo](/docs/getting-started/quickstart#) para el razonamiento completo.
+
+### 7. Easy Builder
+
+```
+? Install Easy Builder? (Y/n)
+```
+
+Auto-detectado a partir de `steasybuilder.zip` + `steasy_trans_panda.zip` en la carpeta. Solo aparece Sí si los dos zips están presentes (el puente no sirve solo).
+
+### 8. Credenciales de admin
+
+```
+? Admin email (default: admin@example.com)
+? Admin password (default: sandbox1234)
+? Admin first name (default: Admin)
+? Admin last name (default: User)
+```
+
+Se guardan en `.ps-lando.json` en la raíz del proyecto. Puedes recuperarlas luego con `ps-lando info`.
+
+<Callout type="warn">
+`.ps-lando.json` contiene credenciales en texto plano. Añádelo a `.gitignore` si versionas la carpeta del proyecto. Es un sandbox local — nunca un archivo de producción.
+</Callout>
+
+### 9. Locale
+
+```
+? Language (default: es)
+? Country (default: es)
+? Timezone (default: Europe/Madrid)
+```
+
+Estos valores van al instalador CLI de PrestaShop.
+
+### 10. Módulos a instalar
+
+Nuevo en 0.5.0:
+
+```
+? What modules to install?
+  ❯ All modules    (default — backwards compatible)
+    Core only      (skips blog, easybuilder, social, marketing)
+    Custom...      (per-group multiselect)
+```
+
+Mira [Selección de módulos](/docs/guides/selecting-modules) para el desglose completo.
+
+### 11. Recipes
+
+Opcional. Un multiselect de scripts incluidos (datos demo, IVA español, cache warmup, etc.). Mira el [Catálogo de recipes](/docs/reference/recipes-catalog).
+
+## Qué pasa después de los prompts
+
+```
+1. Descarga PrestaShop (CDN para 9.x, GitHub para 8.x).
+2. Extracción — zip exterior → zip interior → raíz del sitio.
+3. Genera .lando.yml + lando start.
+4. Ejecuta el instalador CLI de PS.
+5. Extrae el tema Panda + copia los módulos st*.
+6. (Opcional) Extrae steasybuilder + el puente.
+7. Activa Panda (con fallback SQL para los bugs conocidos de PS 8.2.x / 9.x).
+8. Instala módulos en lotes paralelos (concurrencia 3).
+9. Ejecuta init-scripts/ + recipes seleccionadas de fase init.
+10. Smoke-test del front-end.
+11. Ejecuta post-scripts/ + recipes seleccionadas de fase post.
+12. Imprime el resumen de salida.
+```
+
+## El resumen final
+
+Cuando `create` termina, verás un cuadro resumen así:
+
+```
+✔ Sandbox ready
+  Front:     http://my-shop.lndo.site/
+  Admin:     http://my-shop.lndo.site/admin8a3kls9d/
+  phpMyAdmin: http://localhost:53947
+  Mailhog:    http://localhost:53946
+  PS:         9.1.0
+  Theme:      panda
+  Modules:    55/56 active, 1 installed-but-inactive: stupgrader
+  Hooks:      0 init / 0 post
+  Recipes:    spain-taxes ✓
+```
+
+Cada línea:
+
+- **Front / Admin** — abre en navegador con `npx ps-lando open front` / `... open bo`.
+- **Admin path** — aleatorizado por PrestaShop durante el install por seguridad. Persistido en `.ps-lando.json` para que otros comandos lo encuentren.
+- **phpMyAdmin / Mailhog** — puertos aleatorios asignados por Lando. Recuperables vía `lando info` o `ps-lando info`.
+- **Modules** — `<active>/<total>` más una lista de los módulos installed-but-inactive si los hay.
+- **Hooks / Recipes** — cuentas de lo que se ha ejecutado durante create.
+
+## Sobre `stupgrader installed-but-inactive`
+
+`stupgrader` viene incluido con Panda y reporta consistentemente como installed-but-inactive en PS 9.x. El comando install de PrestaShop termina con código 0 pero el módulo nunca cambia `active=1` en `ps_module` — su registro de hook falla silenciosamente. Es una rareza conocida, no un bug de `ps-lando`, y no afecta a tu día a día. Aparece en el resumen para que la diferencia de cuenta no te confunda.
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="Omite grupos enteros o elige por nombre." />
+  <Card title="Hooks y recipes" href="/docs/guides/hooks-and-recipes" description="Automatiza personalizaciones por proyecto." />
+  <Card title="Ciclo de vida del sandbox" href="/docs/guides/sandbox-lifecycle" description="db reset, dump, restore." />
+</Cards>

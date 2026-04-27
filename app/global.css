@@ -2,30 +2,52 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
+/* Mint/teal brand — fresh, modern, doc-friendly. Airy whitespace,
+   minimal borders, document-first feel. */
 @theme {
-  --color-brand-50: oklch(0.98 0.02 65);
-  --color-brand-100: oklch(0.95 0.05 65);
-  --color-brand-200: oklch(0.9 0.1 65);
-  --color-brand-300: oklch(0.83 0.15 60);
-  --color-brand-400: oklch(0.75 0.18 50);
-  --color-brand-500: oklch(0.69 0.2 45);
-  --color-brand-600: oklch(0.62 0.22 40);
-  --color-brand-700: oklch(0.54 0.21 38);
-  --color-brand-800: oklch(0.46 0.18 36);
-  --color-brand-900: oklch(0.38 0.15 35);
+  --color-brand-50: oklch(0.97 0.02 185);
+  --color-brand-100: oklch(0.93 0.04 185);
+  --color-brand-200: oklch(0.87 0.08 185);
+  --color-brand-300: oklch(0.8 0.11 185);
+  --color-brand-400: oklch(0.74 0.13 185);
+  --color-brand-500: oklch(0.66 0.13 185);
+  --color-brand-600: oklch(0.58 0.12 185);
+  --color-brand-700: oklch(0.49 0.1 185);
+  --color-brand-800: oklch(0.4 0.08 185);
+  --color-brand-900: oklch(0.32 0.06 185);
 
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, monospace;
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
 }
 
 :root {
-  --color-fd-primary: oklch(0.69 0.2 45);
-  --color-fd-accent: oklch(0.69 0.2 45 / 0.12);
+  --color-fd-primary: oklch(0.62 0.13 185);
+  --color-fd-accent: oklch(0.62 0.13 185 / 0.1);
+  /* Subtle ring color for illustrated cards — sits over the existing
+     soft border to add a glassy edge without harshness. */
+  --color-border-illustration: oklch(0 0 0 / 0.14);
 }
 
 .dark {
-  --color-fd-primary: oklch(0.83 0.15 60);
-  --color-fd-accent: oklch(0.83 0.15 60 / 0.16);
+  --color-fd-primary: oklch(0.78 0.14 185);
+  --color-fd-accent: oklch(0.78 0.14 185 / 0.14);
+  --color-border-illustration: oklch(1 0 0 / 0.16);
+}
+
+/* Custom utilities: ring / border / divide color all matched to the
+   illustration accent (subtle 14% black / 16% white). */
+.ring-border-illustration {
+  --tw-ring-color: var(--color-border-illustration);
+}
+.border-border-illustration {
+  border-color: var(--color-border-illustration);
+}
+.divide-border-illustration > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--color-border-illustration);
 }
 
 html {
@@ -37,17 +59,106 @@ html > body[data-scroll-locked] {
   --removed-body-scroll-bar-size: 0px !important;
 }
 
-/* Hero gradient (subtle warm glow, brand-tinted) */
-.hero-glow {
-  background:
+/* Soft elevation cards (GitBook-style). */
+.gb-card {
+  background-color: var(--color-fd-card);
+  border: 1px solid color-mix(in oklch, var(--color-fd-border) 80%, transparent);
+  box-shadow:
+    0 1px 2px 0 oklch(0 0 0 / 0.04),
+    0 1px 3px -1px oklch(0 0 0 / 0.04);
+  transition: all 0.2s ease;
+}
+
+.gb-card:hover {
+  border-color: color-mix(in oklch, var(--color-fd-primary) 35%, var(--color-fd-border));
+  box-shadow:
+    0 4px 6px -1px oklch(0 0 0 / 0.06),
+    0 2px 4px -2px oklch(0 0 0 / 0.04);
+}
+
+.dark .gb-card {
+  box-shadow:
+    0 1px 2px 0 oklch(0 0 0 / 0.2),
+    0 1px 3px -1px oklch(0 0 0 / 0.2);
+}
+
+.dark .gb-card:hover {
+  box-shadow:
+    0 4px 6px -1px oklch(0 0 0 / 0.3),
+    0 2px 4px -2px oklch(0 0 0 / 0.2);
+}
+
+/* Subtle film-grain overlay for gradient plates. */
+.noise-overlay {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='1' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 200px 200px;
+}
+
+/* Soft hero backdrop — gradient mesh, low contrast. */
+.hero-mesh {
+  background-image:
     radial-gradient(
-      circle at 30% 20%,
-      oklch(0.7 0.2 45 / 0.18) 0%,
-      transparent 50%
+      ellipse 80% 50% at 50% -20%,
+      color-mix(in oklch, var(--color-fd-primary) 12%, transparent) 0%,
+      transparent 70%
     ),
     radial-gradient(
-      circle at 70% 80%,
-      oklch(0.7 0.18 30 / 0.12) 0%,
-      transparent 60%
+      ellipse 60% 50% at 80% 50%,
+      color-mix(in oklch, var(--color-fd-primary) 6%, transparent) 0%,
+      transparent 70%
     );
+}
+
+/* GitBook-style inline command block. */
+.gb-command {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: color-mix(in oklch, var(--color-fd-card) 100%, transparent);
+  border: 1px solid var(--color-fd-border);
+  transition: all 0.15s ease;
+}
+
+.gb-command:hover {
+  border-color: color-mix(in oklch, var(--color-fd-primary) 50%, var(--color-fd-border));
+}
+
+/* Animate-text / Reveal fallbacks: keep text visible without JS, and skip
+   transforms when the user prefers reduced motion. */
+@media (scripting: none) {
+  [data-anim="text"],
+  [data-anim="text"] *,
+  [data-anim="reveal"] {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}
+
+/* Scan + hue-rotate animations for the bento "vision frame" illustration. */
+@keyframes ps-hue-rotate {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+@keyframes ps-scan {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+.ps-animate-hue-rotate {
+  animation: ps-hue-rotate 4s linear infinite;
+}
+.ps-animate-scan {
+  animation: ps-scan 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-animate-hue-rotate,
+  .ps-animate-scan {
+    animation: none;
+  }
 }

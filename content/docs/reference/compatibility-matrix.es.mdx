@@ -1,0 +1,81 @@
+---
+title: Matriz de compatibilidad
+description: Qué soporta ps-lando en cada versión de PrestaShop, con detalle a nivel de feature.
+---
+
+`ps-lando` está validado contra tres ramas de PrestaShop. Esta página mapea features a versiones para que sepas qué se prueba dónde.
+
+## Ramas de PrestaShop
+
+| Rama | Origen | Estado | PHP recomendado |
+|---|---|---|---|
+| **PS 8.2.x** | Zip de GitHub Releases | ✓ live-tested (PS 8.2.5) | 8.1 (default de la CLI) |
+| **PS 9.0.x** | CDN oficial (`assets.prestashop3.com`) | Esperado OK — no probado directamente con smoke | 8.2 |
+| **PS 9.1.x** | CDN oficial (`assets.prestashop3.com`) | ✓ live-tested (PS 9.1.0) | 8.2 (default de la CLI) |
+
+PHP 7.4, 8.0, 8.1, 8.2, 8.3 son todas seleccionables en el asistente. PS 9 necesita 8.1+. PS 8 funciona con 7.4+ pero la CLI usa por defecto el valor de arriba por sanidad.
+
+## Feature × versión
+
+| Feature | PS 8.2.x | PS 9.0.x | PS 9.1.x |
+|---|---|---|---|
+| **Install del core vía instalador CLI de PS** | ✓ | expected OK | ✓ |
+| **Deploy + activación del tema Panda** | ✓ (fallback SQL) | expected OK (fallback SQL) | ✓ (fallback SQL) |
+| **Deploy de Easy Builder** | ✓ | expected OK | ✓ |
+| **Install de módulos `st*`** | ✓ | expected OK | ✓ |
+| **Install paralelo (concurrencia 3)** | ✓ | expected OK | ✓ |
+| **`prestashop:theme:enable` nativo** | ✗ — bug `Cache.SerializerPath` | ✗ — asumido roto (misma rama de Symfony) | ✗ — bug `LanguageContextBuilder::setLanguageId` |
+| **Auto-creación de directorios de cache de HTMLPurifier** | ✓ (desde 0.4.1) | ✓ | ✓ (afecta también a 9.1 — mira [KB](/docs/kb/htmlpurifier-cache-bug)) |
+| **Reintentos por race de cache de Symfony** | ✓ (desde 0.4.2; 3 reintentos desde 0.5.1) | expected OK | ✓ |
+| **`db reset` / `db dump` / `db restore`** | ✓ (desde 0.6.0) | expected OK | ✓ |
+| **Checklist de `doctor`** | ✓ (desde 0.6.0) | expected OK | ✓ |
+| **Build de Hummingbird 2.0** | n/a | n/a | ✓ |
+
+## Recipes × versión
+
+| Recipe | PS 8.2.x | PS 9.0.x | PS 9.1.x |
+|---|---|---|---|
+| `demo-catalog-10` | ✓ | expected OK | ✓ |
+| `demo-customer-with-orders` | ✓ | expected OK | ✓ |
+| `demo-cms-pages` | ✓ | expected OK | ✓ |
+| `spain-taxes` | ✓ | expected OK | ✓ |
+| `clean-seed` | ✓ | expected OK | ✓ |
+| `cache-warmup` | ✓ | expected OK | ✓ |
+
+Mira [Catálogo de recipes](/docs/reference/recipes-catalog) para qué hace cada una.
+
+## Problemas conocidos que rodeamos
+
+Estos son bugs (o rarezas) de PrestaShop que `ps-lando` mitiga para que no tengas que pensar en ellos. Documentados aquí por completitud — mira las páginas KB enlazadas para los detalles sangrientos.
+
+- **`prestashop:theme:enable` roto en 8.2.x / 9.0.x / 9.1.x.** Errores distintos por rama (cache serializer en 8.2, language context en 9.x). Mitigado desde 0.3.0 con un fallback SQL en `activate-theme` y una lista de versiones known-broken que se salta el intento nativo.
+- **Directorios de cache de HTMLPurifier ausentes en 8.2.x Y 9.1.x.** Los módulos que usan HTMLPurifier (`stbanner`, `stswiper`) fallan con `Base directory /app/var/cache/prod/purifier does not exist`. Mitigado desde 0.4.1 — `runPrestashopCliInstall` siempre pre-crea ambos directorios. Mira el [bug de cache de HTMLPurifier](/docs/kb/htmlpurifier-cache-bug).
+- **`stupgrader` reporta installed-but-inactive en PS 9.x.** El registro de hook falla silenciosamente — el comando install termina con código 0, pero `active=0`. Mostrado honestamente en la cuenta del resumen (`55/56 active, 1 installed-but-inactive: stupgrader`). No afecta al día a día.
+- **Races de cache del contenedor admin de Symfony en installs paralelos.** Dos `prestashop:module install` simultáneos pueden colisionar reconstruyendo la cache. Mitigado desde 0.4.2 con detección de reintentos; subido a 3 reintentos con backoff en 0.5.1. Mira [Races de cache de Symfony](/docs/kb/symfony-cache-races).
+- **Schema drift PS 8.x → 9.x.** Tablas / columnas eliminadas (`ps_product_lang.meta_keywords`, etc.), modo SQL strict activado. Las recipes lo tienen en cuenta; documentado en [Schema drift](/docs/kb/schema-drift-ps-8-9).
+
+## Stack en el que probamos
+
+- **macOS** — Apple Silicon (serie M) + Intel.
+- **Docker Desktop** + **Lando 3.26+**.
+- **Node 20** y **Node 22** vía matriz de CI de GitHub Actions.
+- **Ubuntu** también cubierto por CI (typecheck + tests + build).
+
+Windows no se prueba directamente pero funciona bajo WSL2 + integración WSL de Docker Desktop.
+
+## Cuando falla el fetch del CDN / manifest de GitHub
+
+La resolución de versión es resiliente:
+
+1. Fetch remoto con timeout de 5 s.
+2. Cache local en `~/.cache/ps-lando/manifest/prestashop-versions.json` (TTL 24 h, warning de stale después).
+3. `FALLBACK_MANIFEST` empotrado en la propia CLI — funciona en un avión.
+
+De forma similar, `--ps-zip <path>` se salta la red por completo.
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Catálogo de recipes" href="/docs/reference/recipes-catalog" description="Detalle de tablas-tocadas por recipe." />
+  <Card title="Base de conocimiento" href="/docs/kb/schema-drift-ps-8-9" description="Schema drift, races de cache, bug de HTMLPurifier." />
+</Cards>

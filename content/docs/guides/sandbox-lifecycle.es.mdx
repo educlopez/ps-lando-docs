@@ -1,0 +1,144 @@
+---
+title: Ciclo de vida del sandbox
+description: Reset, dump, restore — mantén tu sandbox iterando rápido.
+---
+
+Añadido en **0.6.0**, la suite de subcomandos `db` te deja iterar sobre un sandbox sin tener que reconstruirlo desde cero. Tres comandos cubren el ciclo habitual: tirar la BD, sacar un snapshot, restaurar un snapshot.
+
+## Cuándo usar cada uno
+
+| Escenario | Comando |
+|---|---|
+| "He roto los datos, dame un PrestaShop limpio otra vez." | `ps-lando db reset` |
+| "Guarda el estado actual — volveré luego." | `ps-lando db dump` |
+| "Tráeme el snapshot que saqué ayer." | `ps-lando db restore <file>` |
+| "Algo va raro — ¿cuál es el estado de este sandbox?" | [`ps-lando doctor`](/docs/guides/doctor) |
+
+Reset es **~3-5 min**. Un `create` completo es **~6 min**. El ahorro viene de saltarse la descarga del CDN + la extracción de Panda.
+
+## `db reset`
+
+Tira la BD del sandbox y re-ejecuta el instalador CLI + install de módulos + activación del tema contra los archivos que ya están en disco. Sin descarga del CDN, sin re-extracción de Panda, sin re-deploy de Easy Builder.
+
+```bash
+ps-lando db reset
+ps-lando db reset -y       # se salta el prompt de confirmación
+```
+
+### Qué hace
+
+1. Prompt de confirmación (saltable con `-y`).
+2. Re-extrae `install/` desde el zip de PS cacheado (PS borra ese directorio post-install por seguridad).
+3. Tira la BD del sandbox.
+4. Re-ejecuta el instalador CLI de PrestaShop con los mismos parámetros de `.ps-lando.json` (admin email/password, idioma, país, zona horaria, dominio).
+5. Re-instala módulos respetando el `module_selection` persistido (los mismos flags `--skip-*` / `--only` que usaste originalmente).
+6. Re-activa el tema Panda.
+7. Re-borra `install/` para reflejar el comportamiento original.
+
+### Qué NO hace
+
+- No re-descarga PS.
+- No re-extrae Panda ni Easy Builder.
+- No re-ejecuta `init-scripts/` ni `post-scripts/` automáticamente — ejecuta `ps-lando hooks run-all` después si quieres re-seedear.
+- No toca archivos en `themes/` ni `modules/`.
+
+<Callout type="info">
+Los sandboxes creados antes de 0.6.0 no tienen `module_selection` en `.ps-lando.json`. Reset por defecto tira de "instalar todo" en esos casos — pasa flags `--skip-*` manualmente si los necesitas.
+</Callout>
+
+## `db dump`
+
+Produce un dump MySQL gzipped de la BD del sandbox.
+
+```bash
+# Por defecto: <project>-<YYYY-MM-DD-HHMM>.sql.gz en el cwd.
+ps-lando db dump
+
+# Ruta personalizada.
+ps-lando db dump backups/before-migration.sql.gz
+
+# Bundle con BD + img/ + themes/<active>/ overrides.
+ps-lando db dump --with-files
+```
+
+### Bundle `--with-files`
+
+Cambia la salida a un `.tar.gz` que contiene:
+
+- `dump.sql` — el mismo contenido que el `.sql.gz`.
+- `img/` — imágenes de productos / categorías subidas vía el BO.
+- `themes/<active>/` — tus overrides de tema (típicamente el tema hijo).
+
+`modules/` está **intencionadamente excluido** — el estado de los módulos es restaurable solo desde el SQL vía `install-modules`. Incluir las fuentes de los módulos engordaría el bundle sin añadir capacidad de recuperación.
+
+Tamaño real de un bundle para un sandbox con 10 productos demo + 3 pedidos: **27 MB total** (1.3 MB SQL + 25 MB img + overrides de temas pequeños).
+
+## `db restore`
+
+Auto-detecta el formato por extensión:
+
+- `.sql.gz` → solo BD.
+- `.tar.gz` / `.tgz` → BD + archivos.
+
+```bash
+ps-lando db restore my-shop-2026-04-25-1430.sql.gz
+ps-lando db restore backup-with-files.tar.gz -y   # se salta confirm
+```
+
+El prompt de confirmación está activo por defecto porque restore sobreescribe la BD viva. Pasa `-y` para saltártelo — casi seguro quieres mantener el prompt salvo en scripts.
+
+El round-trip dump → reset → restore en un PS 9.1.0 real se validó en **6.6 s** solo para el paso de restore. El pipeline en streaming (sin archivos temporales) lo hace rápido incluso con dumps de 100 MB+.
+
+## Prompts de confirmación
+
+Tanto `db reset` como `db restore` preguntan antes de ejecutar porque sobreescriben datos vivos. Pasa `-y` para saltártelo en scripts.
+
+```bash
+ps-lando db reset -y
+ps-lando db restore backup.sql.gz -y
+```
+
+`db dump` no pregunta — solo crea un archivo nuevo.
+
+## Doctor
+
+El cuarto comando del ciclo de vida, [`ps-lando doctor`](/docs/guides/doctor), es una checklist diagnóstica: Lando arrancado, BD accesible, módulos activos, tema correcto, front + BO HTTP responden, directorios de hooks presentes, errores recientes en los logs. Con `--fix`, puede auto-recuperar lo que sea recuperable.
+
+Se merece su propia página — mira [Doctor](/docs/guides/doctor).
+
+## Workflows típicos
+
+### Iterar sobre una recipe
+
+```bash
+# Edita init-scripts/10-my-recipe.sh
+ps-lando db reset -y                 # ~3-5 min
+ps-lando hooks run my-recipe         # re-ejecuta solo mi recipe
+```
+
+### Compartir un estado known-good
+
+```bash
+ps-lando db dump --with-files
+# → my-shop-2026-04-25-1430.tar.gz
+
+# Mándalo al compañero. Él ejecuta:
+cd their-shop
+ps-lando db restore my-shop-2026-04-25-1430.tar.gz
+```
+
+### Recuperarse de un estado roto
+
+```bash
+ps-lando doctor              # diagnostica
+ps-lando doctor --fix        # auto-recupera
+# Si sigue roto:
+ps-lando db reset -y         # opción nuclear sin llegar a `destroy`
+```
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Doctor" href="/docs/guides/doctor" description="Checklist diagnóstico con auto-fixes." />
+  <Card title="Referencia de comandos" href="/docs/reference/commands" description="Tabla completa de comandos con sus flags." />
+</Cards>

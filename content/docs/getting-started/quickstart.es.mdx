@@ -1,0 +1,102 @@
+---
+title: Quickstart
+description: Levanta tu primer sandbox de PrestaShop en 5 minutos.
+---
+
+Esta guía te lleva de cero a un sandbox de PrestaShop completamente funcional con Panda instalado en unos 5 minutos (la mayor parte esperando descargas).
+
+## Requisitos previos
+
+- **Docker Desktop** (o OrbStack, pero Docker Desktop tiene mejor soporte).
+- **Lando 3.x** — `brew install --cask lando` en macOS.
+- **Node 20+** para ejecutar `npx`.
+- El **zip del tema Panda** desde tu cuenta de SunnyToo.
+
+Eso es todo. No necesitas una instalación global de `prestashop`, no necesitas Composer, no necesitas PHP en local.
+
+## 1. Suelta tus zips en una carpeta
+
+Crea un directorio de proyecto y mete ahí tu zip de Panda:
+
+```bash
+mkdir my-shop && cd my-shop
+cp ~/Downloads/panda-theme.zip .
+```
+
+Opcional pero recomendado:
+
+```bash
+cp ~/Downloads/steasybuilder.zip .
+cp ~/Downloads/steasy_trans_panda.zip .   # el puente — necesario si tienes Easy Builder
+```
+
+`ps-lando` detecta automáticamente cualquiera de estos nombres: `panda*.zip`, `steasybuilder*.zip`, `steasy_trans_panda*.zip`.
+
+## 2. Ejecuta create
+
+```bash
+npx ps-lando@latest create
+```
+
+Te aparecerán algunos prompts:
+
+- **Versión de PrestaShop** — elige la más reciente (actualmente 9.1.0). La lista viene del manifest `prestashop-versions.json` en vivo, así que siempre ves lo que hay disponible.
+- **Nombre del proyecto** — por defecto el nombre de la carpeta actual. Será el nombre de la app de Lando + el dominio `.lndo.site`.
+- **Versión de PHP** — sugerida automáticamente según la versión de PS que has elegido. Puedes cambiarla.
+- **Módulos a instalar** — por defecto los 56. Elige "Custom" para deseleccionar grupos (blog, easybuilder, social, marketing).
+- **Recipes** — scripts opcionales incluidos para ejecutar después del install. Datos demo, IVA español, etc. Mira el [Catálogo de recipes](/docs/reference/recipes-catalog).
+
+Si quieres saltarte el asistente:
+
+```bash
+npx ps-lando@latest create -y --ps-version 9.1.0
+```
+
+## 3. Qué pasa durante create
+
+```
+1. Descarga PrestaShop desde el CDN oficial (~117 MB, ~30 s).
+2. Extracción — ZIP exterior → prestashop.zip interior → raíz del sitio.
+3. Ejecuta lando start para levantar Apache + MariaDB + phpMyAdmin + MailHog.
+4. Ejecuta el instalador CLI de PrestaShop (php install/index_cli.php).
+5. Extrae el zip del tema Panda → copia 54 módulos st* a modules/.
+6. (Opcional) Extrae steasybuilder + steasy_trans_panda.
+7. Activa el tema Panda.
+8. Instala todos los módulos en lotes paralelos (concurrencia 3).
+9. Ejecuta las recipes seleccionadas (fase init) y los hooks (init-scripts/).
+10. Smoke test del front-end.
+11. Ejecuta recipes/hooks de la fase post.
+```
+
+Total: ~6 min en la primera ejecución sobre una máquina limpia, ~5 min una vez Docker tiene las imágenes en caché.
+
+## 4. Abre el back-office
+
+Cuando `create` termina, verás un cuadro resumen:
+
+```
+✔ Sandbox lista
+  Front:    http://my-shop.lndo.site/
+  Admin:    http://my-shop.lndo.site/admin8a3kls9d/   ← aleatorizado por PS
+  Modules:  55/56 active, 1 installed-but-inactive: stupgrader
+  PS:       9.1.0
+  Theme:    panda
+```
+
+Abre la URL del back-office y entra con `admin@example.com` / `sandbox1234` (los valores por defecto — sobreescribibles vía flags o el asistente).
+
+```bash
+npx ps-lando open bo
+```
+
+## ¿Qué pasa con stupgrader?
+
+`stupgrader` reporta consistentemente como "installed but not active" en PS 9.x. Es una rareza conocida del install de módulos de PrestaShop — el comando install termina con código 0, pero el módulo nunca cambia `active=1` en `ps_module`. No es un bug de `ps-lando`; el módulo no es crítico para tu día a día. Lo documentamos explícitamente para que la diferencia de cuenta no te confunda.
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="Omite grupos o elige módulos por nombre con flags --skip-* y --only." />
+  <Card title="Recipes" href="/docs/guides/hooks-and-recipes" description="Datos demo, IVA español, cache warmup — scripts incluidos listos para ejecutar." />
+  <Card title="Ciclo de vida del sandbox" href="/docs/guides/sandbox-lifecycle" description="db reset, dump, restore — itera rápido sin recrear desde cero." />
+</Cards>

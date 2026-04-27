@@ -1,0 +1,269 @@
+---
+title: Installation
+description: Prerequisites, supported platforms, and what to expect on a first run.
+---
+
+`ps-lando` itself is a single npm package — `npx ps-lando@latest <command>` is the only invocation you need. Everything else on this page is about the **host machine** that runs Lando + Docker underneath.
+
+## Prerequisites
+
+| Tool | Why | How |
+|---|---|---|
+| **Node.js 20+** | Runs the CLI via `npx`. | [nodejs.org](https://nodejs.org) or your package manager. |
+| **Docker** | Container engine Lando drives. | Docker Desktop (macOS / Windows) or Docker Engine (Linux). |
+| **Lando 3.26+** | Orchestrates Apache + MariaDB + phpMyAdmin + MailHog. | [docs.lando.dev/install](https://docs.lando.dev/install/). |
+| `unzip`, `curl`, `git` | Used internally by the CLI. | Preinstalled on macOS/Linux. On Windows: use WSL2. |
+
+<Callout type="warn">
+If you have OrbStack installed, you still need Docker Desktop **installed** (it doesn't have to be running) so that `/Applications/Docker.app` exists on disk. Lando's engine check otherwise fails. See [lando/core#138](https://github.com/lando/core/issues/138).
+</Callout>
+
+## SunnyToo zips
+
+Download these once from your SunnyToo customer account and keep them somewhere durable (e.g. `~/Documents/sunnytoo-assets/`). Each developer uses their own license — no shared infra, no licensing gray area.
+
+| File | What it is | Required? |
+|---|---|---|
+| `panda.zip` (or `panda-theme.zip`) | The Panda theme bundle. | Yes — to install Panda. |
+| `steasybuilder.zip` | Easy Builder visual editor module. | Only if you licensed Easy Builder. |
+| `steasy_trans_panda.zip` | Easy Builder ↔ Panda bridge. | Only if you have `steasybuilder.zip` — useless alone. |
+
+The CLI does case-insensitive prefix matching, so any of `panda.zip`, `panda-theme.zip`, `Panda2.zip`, `easybuilder.zip`, `steasy-builder.zip`, etc. are accepted. Use a clean folder per project to avoid surprises if you have multiple matching files.
+
+## macOS
+
+The most-tested platform. Works natively on Apple Silicon (M1 / M2 / M3 / M4) — Docker images run natively or via Rosetta seamlessly.
+
+```bash
+brew install node
+brew install --cask docker
+brew install --cask lando
+```
+
+Start Docker Desktop once from Applications so it accepts permissions and creates `~/.docker/`. After that, Lando handles starting/stopping containers as needed.
+
+```bash
+node --version    # v20+ expected
+docker --version  # any recent version
+lando version
+```
+
+## Linux
+
+Works on any distro that can run Docker Engine + Node 20. The setup is per-distro for Docker, then Lando provides a single deb/rpm package.
+
+### Ubuntu / Debian
+
+**1. Install Docker Engine** (community edition, free):
+
+Add Docker's official APT repo and install:
+
+```bash
+# Remove any old podman/docker.io packages first
+sudo apt-get remove docker docker-engine docker.io containerd runc 2>/dev/null
+
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+For Debian, swap `ubuntu` for `debian` in the URLs above.
+
+**2. Run Docker without sudo**:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker     # apply the group in current shell, or log out + back in
+docker run hello-world
+```
+
+**3. Install Node.js 20**:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+**4. Install Lando**:
+
+Grab the latest `.deb` from [lando releases](https://github.com/lando/cli/releases):
+
+```bash
+curl -fsSL https://files.lando.dev/installer/setup-lando.sh | bash
+# or download lando-stable.deb manually and:
+# sudo dpkg -i lando-stable.deb
+```
+
+### Fedora / RHEL / CentOS Stream
+
+```bash
+# Docker
+sudo dnf -y install dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER && newgrp docker
+
+# Node.js 20
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo dnf install -y nodejs
+
+# Lando
+curl -fsSL https://files.lando.dev/installer/setup-lando.sh | bash
+```
+
+### Arch / Manjaro
+
+```bash
+sudo pacman -Syu docker docker-buildx docker-compose nodejs npm
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER && newgrp docker
+
+# Lando — install via the official setup script
+curl -fsSL https://files.lando.dev/installer/setup-lando.sh | bash
+```
+
+### Verify Linux install
+
+```bash
+node --version       # v20+
+docker --version
+docker compose version
+lando version
+docker run --rm hello-world   # confirms daemon + permissions
+```
+
+<Callout type="info">
+  **Performance tip**: keep your project files on a native Linux filesystem (`ext4`, `btrfs`). Avoid Docker volumes mounted from `/mnt/c/...` or other foreign filesystems — they slow things down significantly.
+</Callout>
+
+### Common Linux gotchas
+
+- **`Cannot connect to the Docker daemon`** — you forgot `sudo usermod -aG docker $USER` (or didn't run `newgrp docker` / log out+in after).
+- **`failed to start daemon: error initializing graphdriver`** — almost always a `cgroup v2` issue on older kernels. Update to kernel 5.15+ or check `/etc/docker/daemon.json`.
+- **Lando port conflicts** — if you already run Apache or MySQL on the host, `lando start` will fail. Stop the host services or change Lando's exposed ports in `.lando.yml`.
+- **SELinux on Fedora/RHEL** — if mounts behave oddly, try `:Z` on bind mounts. Lando handles this internally for its own services.
+
+## Windows
+
+Use **WSL2** with Docker Desktop's WSL integration. `ps-lando` uses POSIX tools (`unzip`, `curl`, `git`) and assumes a Unix shell — running it from PowerShell or CMD won't work.
+
+### One-time setup
+
+**1. Install WSL2 + Ubuntu** (admin PowerShell, one command):
+
+```powershell
+wsl --install
+```
+
+This installs WSL2 and sets Ubuntu as the default distro. Reboot when prompted, then open Ubuntu from Start. Set a username + password the first time it launches.
+
+If you want a different distro: `wsl --list --online` shows available ones, `wsl --install -d <Name>` installs the one you pick.
+
+**2. Update WSL after the first launch**:
+
+```powershell
+wsl --update
+wsl --set-default-version 2
+```
+
+**3. Install Docker Desktop**:
+
+Download from [docker.com](https://www.docker.com/products/docker-desktop/). After install, open Settings:
+
+- **General** → check "Use the WSL 2 based engine".
+- **Resources → WSL Integration** → enable for your Ubuntu distro.
+- Apply + restart.
+
+Verify from inside WSL Ubuntu:
+
+```bash
+docker version            # should show Server: Docker Desktop
+docker run hello-world
+```
+
+**4. Install Node 20 + Lando inside WSL**:
+
+```bash
+# Inside the WSL Ubuntu shell:
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+curl -fsSL https://files.lando.dev/installer/setup-lando.sh | bash
+```
+
+### Where to put your project files
+
+**Inside the WSL filesystem** (e.g. `/home/<user>/projects/my-shop`), **not** on the Windows side (`/mnt/c/Users/...`). Cross-filesystem I/O across the WSL boundary is 5–10× slower and breaks file watchers in Lando.
+
+```bash
+cd ~                           # /home/<user>/
+mkdir -p projects/my-shop
+cd projects/my-shop
+cp /mnt/c/Users/<you>/Downloads/panda-theme.zip .
+npx ps-lando@latest create
+```
+
+If you use VS Code, install the [WSL extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl). Open the project with **File → Open Folder in WSL** so the editor talks to the Linux filesystem natively.
+
+### Verify Windows install
+
+From the WSL Ubuntu shell:
+
+```bash
+node --version        # v20+
+docker --version      # the Docker Desktop server
+lando version
+```
+
+### Common Windows gotchas
+
+- **`docker: command not found` inside WSL** — Docker Desktop's WSL integration isn't enabled for that distro. Settings → Resources → WSL Integration.
+- **`lando start` hangs at "starting Docker"** — make sure Docker Desktop is actually running on Windows (system tray icon). WSL can't start it on its own.
+- **Files saved in Windows aren't picked up by Lando** — your project lives on `/mnt/c/...`. Move it to `/home/<user>/...` and re-create the sandbox.
+- **`exec format error`** — your WSL is still on WSL1. Run `wsl --set-version Ubuntu 2` from PowerShell.
+
+## First run — what to expect
+
+The first `ps-lando create` on a fresh machine will be a few minutes slower than later runs. Docker pulls the LAMP recipe images on first start; subsequent sandboxes reuse those cached images.
+
+| Phase | Cold (first machine setup) | Warm (subsequent sandboxes) |
+|---|---|---|
+| Download PrestaShop | ~30 s (PS 9 from CDN, cached after) | ~0 s (zip cached at `~/.cache/ps-lando/prestashop/`) |
+| `lando start` (image pull + boot) | ~2-3 min | ~10-20 s |
+| CLI installer + Panda + module install | ~3-5 min | ~3-5 min |
+| **Total** | **~6 min** | **~5 min** |
+
+Both PS 8.2.x and PS 9.1.x land in roughly the same window — PS 9 pulls the pre-built edition from the official PrestaShop CDN (no Composer inside Lando required since 0.3.0).
+
+## Verify your install
+
+Once the prereqs are in place, you don't need to install `ps-lando` separately. `npx` handles it:
+
+```bash
+npx ps-lando@latest --version
+```
+
+Optional: pin a global install if you don't want to wait for npx every time.
+
+```bash
+npm i -g ps-lando
+ps-lando --version
+```
+
+## Next steps
+
+<Cards>
+  <Card title="Quickstart" href="/docs/getting-started/quickstart" description="Spin up your first sandbox in 5 minutes." />
+  <Card title="First sandbox walk-through" href="/docs/guides/first-sandbox" description="Each prompt of the create wizard explained." />
+</Cards>

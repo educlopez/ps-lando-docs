@@ -1,0 +1,116 @@
+---
+title: Doctor
+description: Checklist diagnóstico para tu sandbox — con auto-fixes opcionales.
+---
+
+Añadido en **0.6.0**, `ps-lando doctor` es un comando diagnóstico que ejecuta una checklist de comprobaciones de salud contra tu sandbox y reporta ✓ / ⚠ / ✗ por ítem, con sugerencias de comando para arreglar cualquier cosa rara.
+
+`ps-lando doctor --fix` va un paso más allá y pregunta para auto-recuperar todo lo que sea recuperable.
+
+## Ejecútalo
+
+```bash
+ps-lando doctor
+ps-lando doctor --fix    # auto-recuperación interactiva
+```
+
+No tienes que pasar una ruta — doctor usa el cwd, igual que el resto de comandos.
+
+## Qué comprueba
+
+| Comprobación | Qué verifica | ¿Auto-fixable? |
+|---|---|---|
+| **Lando arrancado** | `lando list` termina con código 0 y el proyecto está en la salida. | Sí — ejecuta `lando start`. |
+| **BD accesible** | Un `SELECT 1` trivial corre vía `landoMysql`. | No — sugiere `lando restart`. |
+| **Cuenta de módulos `st*` activos** | Cuenta `ps_module.active=1` para filas `st%` en BD. Compara con el esperado (desde `module_selection` en `.ps-lando.json`). | Sí — reintenta cualquier módulo installed-but-inactive. |
+| **Tema activo = panda** | `SELECT theme_name FROM ps_shop`. | Sí — ejecuta `UPDATE ps_shop SET theme_name='panda'` + cache clear. |
+| **Front HTTP** | `curl` contra `http://<project>.lndo.site/` — espera 200. | No — sugiere `ps-lando repair`. |
+| **BO HTTP** | `curl` contra `http://<project>.lndo.site/<admin_dir>/` — espera 200 o 302. | No. |
+| **`init-scripts/` existe** | Comprobación blanda — informativa, no es error. | n/a |
+| **`post-scripts/` existe** | Comprobación blanda — informativa, no es error. | n/a |
+| **Errores recientes en `var/logs/`** | Hace grep de líneas `ERROR` / `CRITICAL` en el último log. | No — los muestra para que tú los leas. |
+| **Resumen del último `.ps-lando-install.log`** | Reporta cuenta de módulos fallidos en el último install. | No. |
+| **`/app/var/cache/{prod,dev}/purifier/` existen** | PS 8.2.x Y PS 9.1.x se los saltan — mira el [bug de cache de HTMLPurifier](/docs/kb/htmlpurifier-cache-bug). | Sí — `mkdir -p` + chown. |
+
+## Leer la salida
+
+Cada comprobación produce uno de tres estados:
+
+```
+✓ Lando running
+✓ Database accessible
+✗ Active modules: 53/56 active (3 installed-but-inactive: stbanner, stswiper, stupgrader)
+  fix: ps-lando doctor --fix    # retry the inactive ones
+✓ Active theme: panda
+⚠ Recent errors in var/logs/prod-log.txt:
+    [2026-04-25 14:32] CRITICAL — module stswiper: HTMLPurifier cache dir missing
+✓ Hooks: 0 init / 0 post
+```
+
+- **✓** — limpio.
+- **⚠** — informativo, no es un fallo duro (p. ej. líneas de log que deberías mirar).
+- **✗** — fallo duro con sugerencia de fix debajo.
+
+## Defaults de `--fix`
+
+Para cada ítem fallido que sea fixable, `--fix` pregunta interactivamente. Los defaults son:
+
+| Fix | Default |
+|---|---|
+| `lando start` | Sí (no destructivo) |
+| `mkdir -p` de directorios de purifier | Sí (no destructivo) |
+| Reintentar módulos installed-but-inactive | Sí (no destructivo) |
+| `UPDATE ps_shop SET theme_name='panda'` + cache clear | **No** (destructivo — toca BD) |
+
+Los ítems que no son auto-recuperables (BD inaccesible, fallos HTTP) imprimen sugerencias pero no preguntan.
+
+```bash
+ps-lando doctor --fix
+```
+
+```
+✓ Lando running
+✗ Active modules: 53/56 active
+  ? Retry installed-but-inactive modules? (Y/n) Y
+  → retrying stbanner... ✓
+  → retrying stswiper... ✓
+  → retrying stupgrader... ⚠ still inactive (known PS 9 quirk)
+✗ Theme: hummingbird (expected: panda)
+  ? Run UPDATE ps_shop SET theme_name='panda' + cache clear? (y/N) y
+  ✓ theme reset
+```
+
+## Cuándo ejecutarlo
+
+- **Después de un `create` fallido** — comprobación rápida de cordura.
+- **Después de un `db reset`** — verifica que todo volvió limpio.
+- **Volviendo a un sandbox después de semanas** — chequeo de salud rápido.
+- **Antes de reportar un bug** — pega la salida de doctor como tu primer diagnóstico.
+
+## Lo que doctor NO atrapa
+
+- Bugs funcionales a nivel de módulo (un módulo se instala limpio pero no renderiza su hook).
+- Problemas de renderizado de tema que no estén en `var/logs/`.
+- Errores de JS en el lado del navegador.
+- Conflictos entre módulos (dos módulos registrando el mismo hook con lógica incompatible).
+
+Para esos, usa el BO + DevTools del navegador como siempre.
+
+## Doctor como smoke test
+
+Puedes ejecutar doctor en CI o después de cualquier paso del pipeline que toque el sandbox:
+
+```bash
+ps-lando db reset -y
+ps-lando hooks run-all
+ps-lando doctor || exit 1   # bail si algo está rojo
+```
+
+Se devuelve un código de salida distinto de cero si alguna comprobación está en estado ✗. Los estados ⚠ no fallan la ejecución.
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Bug de cache de HTMLPurifier" href="/docs/kb/htmlpurifier-cache-bug" description="El bug de PS 8.2.x / 9.1.x que hace necesaria la comprobación de purifier." />
+  <Card title="Ciclo de vida del sandbox" href="/docs/guides/sandbox-lifecycle" description="db reset / dump / restore." />
+</Cards>

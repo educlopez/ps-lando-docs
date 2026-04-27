@@ -1,0 +1,146 @@
+---
+title: Catálogo de recipes
+description: Cada recipe incluida en detalle — qué hace, qué toca, idempotencia.
+---
+
+`ps-lando` incluye 6 recipes listas para usar. Esta página es la inmersión por recipe — para el resumen conceptual, mira [Hooks y recipes](/docs/guides/hooks-and-recipes).
+
+## Cómo leer esta página
+
+Cada entrada cubre:
+
+- **Phase** — `init` (corre antes del smoke test) o `post` (corre después).
+- **Requires** — prerrequisitos que la recipe asume (p. ej. Panda tiene que estar instalado).
+- **What it does** — efecto a alto nivel.
+- **Tables touched** — tablas de BD donde la recipe escribe.
+- **Idempotency** — ¿es seguro re-ejecutar? S/N + matiz.
+
+## `demo-catalog-10`
+
+| Campo | Valor |
+|---|---|
+| Phase | `init` |
+| Requires | Panda instalado |
+| Tables touched | `ps_category`, `ps_category_lang`, `ps_product`, `ps_product_lang`, `ps_image`, `ps_image_lang`, `ps_stock_available` |
+| Idempotency | No — re-ejecutar crea duplicados. Ejecuta `clean-seed` primero si necesitas resetear. |
+
+Crea una categoría "Demo" con **10 productos demo**. Las imágenes se sacan de picsum.photos en escala de grises, deterministas por seed (el mismo producto siempre obtiene la misma imagen). Útil para demos de sandbox y tests de capturas donde no quieres commitear imágenes reales de producto.
+
+## `demo-customer-with-orders`
+
+| Campo | Valor |
+|---|---|
+| Phase | `init` |
+| Requires | — |
+| Tables touched | `ps_customer`, `ps_address`, `ps_orders`, `ps_order_detail`, `ps_order_history`, `ps_cart`, `ps_cart_product` |
+| Idempotency | No — crea un cliente fresco + 3 pedidos en cada ejecución. |
+
+Seedea:
+
+- Un cliente demo (email + password de test).
+- Una dirección con formato España vinculada a ese cliente.
+- **3 pedidos en estados distintos** (pago pendiente, procesando, enviado) para que puedas probar filtros de la lista de pedidos y transiciones de estado en el BO.
+
+Compatible con `clean-seed` desde 0.4.1 (que ahora usa una allow-list de emails en vez de un rango de `id_customer` — mira la entrada del changelog para contexto).
+
+## `demo-cms-pages`
+
+| Campo | Valor |
+|---|---|
+| Phase | `init` |
+| Requires | — |
+| Tables touched | `ps_cms`, `ps_cms_lang`, `ps_cms_shop`, `ps_cms_category` |
+| Idempotency | No — `INSERT`s sin dedup. |
+
+Crea 3 páginas CMS estándar — **Sobre nosotros**, **Contacto**, **Términos** — en **ES + EN**. Útil para smoke tests de enlaces de footer y desarrollo de plantillas de tema.
+
+## `spain-taxes`
+
+| Campo | Valor |
+|---|---|
+| Phase | `init` |
+| Requires | — |
+| Tables touched | `ps_tax`, `ps_tax_lang`, `ps_tax_rule`, `ps_tax_rules_group`, `ps_tax_rules_group_lang`, `ps_configuration` |
+| Idempotency | Parcial — usa `INSERT IGNORE` donde puede. Re-ejecutar no duplica los grupos de impuestos pero refresca los valores de configuración. |
+
+Crea los **3 grupos de reglas de IVA español** (21%, 10%, 4%) y configura:
+
+- País por defecto → ES.
+- Moneda por defecto → EUR.
+
+Ejecuta esto en cualquier sandbox del mercado español antes de importar productos reales.
+
+## `clean-seed`
+
+| Campo | Valor |
+|---|---|
+| Phase | `init` |
+| Requires | — |
+| Tables touched | `ps_product`, `ps_product_lang`, `ps_image`, `ps_image_lang`, `ps_stock_available`, `ps_customer`, `ps_orders` (cuando aplica) |
+| Idempotency | Sí — `DELETE` es idempotente. Seguro re-ejecutar. |
+
+Borra los datos demo nativos de PrestaShop:
+
+- **Productos 1-9** (el catálogo demo por defecto que viene con PS).
+- **Clientes demo** por allow-list de email (actualmente `pub@prestashop.com`, solo PS 8.2.x). `anonymous@psgdpr.com` se **preserva intencionadamente** porque el módulo GDPR lo necesita para la anonimización — no son datos seed.
+- **Imágenes huérfanas** referenciadas por productos eliminados.
+
+<Callout type="info">
+El enfoque de allow-list de email (desde 0.4.1) reemplazó un delete por rango `id_customer BETWEEN 2 AND 4` anterior. El rango destruía clientes seedeados por `demo-customer-with-orders`. Seguro encadenar con esa recipe en cualquier orden ahora.
+</Callout>
+
+## `cache-warmup`
+
+| Campo | Valor |
+|---|---|
+| Phase | `post` |
+| Requires | — |
+| Tables touched | Ninguna — HTTP solo lectura. |
+| Idempotency | Sí — GET HTTP puro. |
+
+Pega una lista curada de URLs con `curl` para precalentar la cache del contenedor de Symfony:
+
+- Front-page (`/`)
+- Back-office (`/<admin_dir>/`)
+- Una página de categoría
+- El carrito
+- La página de contacto
+
+Reduce la latencia de la primera renderización para quien abra el BO justo después de `create`. Especialmente notable en PS 9 con el contenedor de admin más grande.
+
+## Matriz de compatibilidad
+
+Cada recipe incluida está validada contra sandboxes vivos de PS 8.2.5 y PS 9.1.0. PS 9.0.x se lista como "expected OK" — comparte el esquema de 9.x pero no se ha ejercitado en nuestros smoke runs.
+
+| Recipe | PS 8.2.x | PS 9.0.x | PS 9.1.x |
+|---|---|---|---|
+| `demo-catalog-10` | ✓ | expected OK | ✓ |
+| `demo-customer-with-orders` | ✓ | expected OK | ✓ |
+| `demo-cms-pages` | ✓ | expected OK | ✓ |
+| `spain-taxes` | ✓ | expected OK | ✓ |
+| `clean-seed` | ✓ | expected OK | ✓ |
+| `cache-warmup` | ✓ | expected OK | ✓ |
+
+## Cómo ejecutarlas
+
+Tres formas:
+
+```bash
+# En tiempo de create, multiselect interactivo.
+ps-lando create
+
+# En tiempo de create, por nombre (no interactivo).
+ps-lando create -y --recipes spain-taxes,demo-cms-pages
+
+# En un sandbox existente.
+ps-lando hooks run spain-taxes
+```
+
+Mira [Hooks y recipes](/docs/guides/hooks-and-recipes) para el resumen completo lado-operador, incluyendo `hooks install <name>` para copiar una recipe en el `init-scripts/` de tu proyecto y tener ejecuciones repetibles.
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Hooks y recipes" href="/docs/guides/hooks-and-recipes" description="El resumen conceptual." />
+  <Card title="Matriz de compatibilidad" href="/docs/reference/compatibility-matrix" description="Qué se prueba en qué versión." />
+</Cards>

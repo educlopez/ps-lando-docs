@@ -1,0 +1,195 @@
+---
+title: Your first sandbox
+description: A guided walk-through of the create wizard — every prompt explained.
+---
+
+If you've never run `ps-lando create` before, this guide walks you through the interactive wizard prompt by prompt so you know exactly what each choice does.
+
+## Before you start
+
+You should have:
+
+- Docker Desktop running.
+- Lando 3.x installed.
+- A folder containing your `panda.zip` (and optionally `steasybuilder.zip` + `steasy_trans_panda.zip`).
+
+If any of those aren't in place, see [Installation](/docs/getting-started/installation) first.
+
+## Run create
+
+```bash
+mkdir my-shop && cd my-shop
+cp ~/Downloads/panda*.zip .
+cp ~/Downloads/steasy*.zip .          # optional
+npx ps-lando@latest create
+```
+
+## The prompts
+
+### 1. PrestaShop version
+
+```
+? Pick a PrestaShop version
+  ❯ 9.1.0   (latest stable)
+    9.0.3
+    9.0.2
+    8.2.5
+    8.2.4
+    ...
+```
+
+The list comes from the official [`prestashop-flashlight` manifest](https://github.com/PrestaShop/prestashop-flashlight) (cached for 24 h, with offline fallback). New PS releases appear without bumping `ps-lando`.
+
+- **9.x** → downloaded from `assets.prestashop3.com` as a pre-built edition (vendor/, compiled assets, ~55 bundled modules). Fast.
+- **8.x** → downloaded from GitHub Releases.
+
+### 2. Project name
+
+```
+? Project name (default: my-shop)
+```
+
+Defaults to the current folder name. This becomes:
+
+- The Lando app name (`name:` in `.lando.yml`).
+- The hostname: `<project>.lndo.site`.
+- The `.ps-lando.json` `project` field.
+
+You can almost always accept the default.
+
+### 3. PHP version
+
+```
+? PHP version (recommended for PS 9.1.x: 8.2)
+  ❯ 8.2
+    8.1
+    8.3
+```
+
+Auto-suggested based on the PrestaShop branch you picked. PS 9 needs 8.1+. PS 8 works with 7.4+ but the CLI defaults to 8.1 / 8.2.
+
+If you choose a PHP that differs from the flashlight recommendation for the chosen PS branch, the wizard asks once before writing `.lando.yml`.
+
+### 4. Database, phpMyAdmin, MailHog
+
+Defaults: MySQL + phpMyAdmin + MailHog all enabled. Recommended unless you have a specific reason to drop one.
+
+### 5. Panda theme
+
+```
+? Install Panda theme? (Y/n)
+```
+
+Auto-detected: if a `panda*.zip` is in the folder, default is Yes. If not, default is No (you'll get a bare PrestaShop sandbox).
+
+### 6. Child theme
+
+```
+? Create child theme? (Y/n)
+```
+
+**Always say Yes.** A child theme (`themes/<project>_child/`) is where your customisations live. Editing the parent `themes/panda/` directly gets wiped on Panda updates. See [child theme convention](/docs/getting-started/quickstart#) for the full reasoning.
+
+### 7. Easy Builder
+
+```
+? Install Easy Builder? (Y/n)
+```
+
+Auto-detected from `steasybuilder.zip` + `steasy_trans_panda.zip` in the folder. Only show Yes if both zips are present (the bridge is useless alone).
+
+### 8. Admin credentials
+
+```
+? Admin email (default: admin@example.com)
+? Admin password (default: sandbox1234)
+? Admin first name (default: Admin)
+? Admin last name (default: User)
+```
+
+Stored in `.ps-lando.json` at the project root. You can recover them later with `ps-lando info`.
+
+<Callout type="warn">
+`.ps-lando.json` contains plaintext credentials. Add it to `.gitignore` if you version-control the project folder. It's a local sandbox only — never a production file.
+</Callout>
+
+### 9. Locale
+
+```
+? Language (default: es)
+? Country (default: es)
+? Timezone (default: Europe/Madrid)
+```
+
+These flow into the PrestaShop CLI installer.
+
+### 10. Modules to install
+
+New in 0.5.0:
+
+```
+? What modules to install?
+  ❯ All modules    (default — backwards compatible)
+    Core only      (skips blog, easybuilder, social, marketing)
+    Custom...      (per-group multiselect)
+```
+
+See [Selecting modules](/docs/guides/selecting-modules) for the full breakdown.
+
+### 11. Recipes
+
+Optional. A multiselect of bundled scripts (demo data, ES taxes, cache warmup, etc.). See [Recipes catalog](/docs/reference/recipes-catalog).
+
+## What happens after the prompts
+
+```
+1. Download PrestaShop (CDN for 9.x, GitHub for 8.x).
+2. Extract — outer zip → inner zip → site root.
+3. Generate .lando.yml + lando start.
+4. Run the PS CLI installer.
+5. Extract Panda theme + copy st* modules.
+6. (Optional) Extract steasybuilder + bridge.
+7. Activate Panda (with SQL fallback for known PS 8.2.x / 9.x bugs).
+8. Install modules in parallel batches (concurrency 3).
+9. Run init-scripts/ + selected init-phase recipes.
+10. Smoke-test the front-end.
+11. Run post-scripts/ + selected post-phase recipes.
+12. Print the outro summary.
+```
+
+## The outro
+
+When `create` finishes, you'll see a summary box like this:
+
+```
+✔ Sandbox ready
+  Front:     http://my-shop.lndo.site/
+  Admin:     http://my-shop.lndo.site/admin8a3kls9d/
+  phpMyAdmin: http://localhost:53947
+  Mailhog:    http://localhost:53946
+  PS:         9.1.0
+  Theme:      panda
+  Modules:    55/56 active, 1 installed-but-inactive: stupgrader
+  Hooks:      0 init / 0 post
+  Recipes:    spain-taxes ✓
+```
+
+Each line:
+
+- **Front / Admin** — open in browser with `npx ps-lando open front` / `... open bo`.
+- **Admin path** — randomized by PrestaShop during install for security. Persisted in `.ps-lando.json` so other commands find it.
+- **phpMyAdmin / Mailhog** — random ports assigned by Lando. Recoverable via `lando info` or `ps-lando info`.
+- **Modules** — `<active>/<total>` plus a list of any installed-but-inactive modules.
+- **Hooks / Recipes** — counts of what ran during create.
+
+## About `stupgrader installed-but-inactive`
+
+`stupgrader` is bundled with Panda and consistently reports as installed-but-inactive on PS 9.x. The PrestaShop install command exits 0 but the module never flips `active=1` in `ps_module` — its hook registration silently fails. Known quirk, not a `ps-lando` bug, and it doesn't affect your day-to-day work. It's surfaced in the outro so the count discrepancy doesn't confuse you.
+
+## Next steps
+
+<Cards>
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="Skip whole groups or cherry-pick by name." />
+  <Card title="Hooks & recipes" href="/docs/guides/hooks-and-recipes" description="Automate per-project customisations." />
+  <Card title="Sandbox lifecycle" href="/docs/guides/sandbox-lifecycle" description="db reset, dump, restore." />
+</Cards>

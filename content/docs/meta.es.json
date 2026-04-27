@@ -1,0 +1,14 @@
+{
+  "title": "ps-lando",
+  "pages": [
+    "index",
+    "---Empezar---",
+    "getting-started",
+    "---Guías---",
+    "guides",
+    "---Referencia---",
+    "reference",
+    "---Base de conocimiento---",
+    "kb"
+  ]
+}

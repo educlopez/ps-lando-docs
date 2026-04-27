@@ -1,0 +1,104 @@
+---
+title: Races de cache del contenedor admin de Symfony
+description: Los installs paralelos de módulos pueden colisionar en la cache del contenedor de Symfony — cómo lo detecta y se recupera ps-lando.
+---
+
+Descubierto al validar v0.4.2 con installs paralelos de módulos. Dos invocaciones concurrentes de `prestashop:module install` pueden colisionar reescribiendo la cache del contenedor admin, produciendo una de dos variantes de error. `ps-lando` detecta ambas y reintenta.
+
+## El problema
+
+Cuando `ps-lando install-modules` corre con la concurrencia 3 por defecto, varios installs de módulos pasan simultáneamente dentro del contenedor appserver. Cada install dispara que Symfony reconstruya la cache del contenedor admin (porque instalar un módulo registra servicios / comandos nuevos). Dos workers escribiendo en los mismos archivos de cache al mismo tiempo pueden pisarse.
+
+Dos variantes reproducibles:
+
+## Variante A — Rename del filesystem a media escritura
+
+```
+In Filesystem.php line 320:
+Cannot rename "/app/var/cache/prod/ContainerXxx/Foo.php<tmp>" to
+"/app/var/cache/prod/ContainerXxx/Foo.php": rename(...): No such file or directory
+```
+
+**Causa**: el worker 1 escribió `Foo.php<tmp>` y está a punto de renombrarlo atómicamente a `Foo.php`. El worker 2 borra o reescribe el archivo tmp antes de que el rename del worker 1 corra. El rename del worker 1 falla con "no such file or directory".
+
+## Variante B — Failed to open stream + el kernel no arranca
+
+```
+Warning: require(/app/var/cache/prod/ContainerXxx/Foo.php):
+  Failed to open stream: No such file or directory
+[...]
+Command "prestashop:module" is not defined
+```
+
+**Causa**: el kernel del worker 2 intenta arrancar haciendo `require` de un `.php` que el worker 1 sigue escribiendo. El require falla, Symfony no registra los comandos de PrestaShop, y la CLI pierde silenciosamente `prestashop:module`. El siguiente comando en ese worker reporta el comando como no definido.
+
+## Mitigación en `ps-lando`
+
+### v0.4.2 — detectar + reintentar una vez
+
+- `isSymfonyCacheRaceError()` en `src/commands/install-modules.ts` detecta ambas variantes haciendo string-match en `stdout`/`stderr`.
+- Al detectar, `installOneModule` reintenta el módulo fallido **una vez** después de que los installs hermanos hayan drenado.
+- Forensics de los dos intentos se anexan a `.ps-lando-install.log` (timestamps, número de intento, resultado).
+
+Empíricamente un reintento solía bastar, porque cuando arranca el reintento los hermanos paralelos han terminado su rebuild de cache y han parado de competir.
+
+### v0.5.1 — 3 reintentos con backoff exponencial
+
+Los smoke tests de 0.5.0 mostraron casos donde un módulo (típicamente `stbanner`) perdía la race **dos veces seguidas** — el reintento único que se incluyó en 0.4.2 no bastaba para sobrevivir un rebuild de cache hermano que seguía en vuelo. v0.5.1 reintenta hasta **3 veces con delays crecientes**:
+
+| Intento | Delay antes |
+|---|---|
+| 1 | 0 ms (inicial) |
+| 2 | 500 ms |
+| 3 | 1500 ms |
+| 4 | 3000 ms |
+
+Presupuesto total: ~5 s en el peor caso. En la práctica el intento 2 o 3 gana casi siempre.
+
+Forensics por intento en `.ps-lando-install.log`:
+
+```
+[2026-04-25 14:32:12] stbanner — install attempt 1/4 — FAILED (Symfony cache race A)
+[2026-04-25 14:32:12] stbanner — retry attempt 2/4 delayMs=500
+[2026-04-25 14:32:13] stbanner — install attempt 2/4 — FAILED (Symfony cache race A)
+[2026-04-25 14:32:13] stbanner — retry attempt 3/4 delayMs=1500
+[2026-04-25 14:32:15] stbanner — install attempt 3/4 — OK
+```
+
+### Early-exit en fallos no-race
+
+Si un reintento falla con un error que **no es** una race de cache (p. ej. una dependencia ausente, un syntax error en el PHP del módulo), el bucle sale antes en lugar de gastar el resto del presupuesto de reintentos en un fallo determinista.
+
+### El reintento de HTMLPurifier se queda en 1
+
+El bug de directorio de cache de HTMLPurifier también tiene lógica de reintento, pero se queda en **1 intento** porque el fix es determinista e instantáneo — crear el directorio que falta y reintentar. Sin necesidad de backoff. Mira el [bug de cache de HTMLPurifier](/docs/kb/htmlpurifier-cache-bug).
+
+## Helpers exportados (para tests)
+
+```ts
+import {
+  isSymfonyCacheRaceError,
+  SYMFONY_RACE_MAX_RETRIES,
+  SYMFONY_RACE_BACKOFFS_MS,
+} from "ps-lando/src/commands/install-modules";
+```
+
+Se exportan para que `tests/install-modules.test.ts` pueda verificar la matriz de detección y la secuencia de backoff.
+
+## Implicaciones a futuro
+
+- **Subir `MAX_CONCURRENT` por encima de 3** requiere re-validación contra sandboxes reales — la tasa de colisión no es lineal con la concurrencia.
+- **Si Panda (u otras distribuciones de módulos) declaran `<dependencies>` en `config.xml`**, el sort topológico que ya hay en `src/lib/module-deps.ts` dividirá los installs por niveles de dependencia naturalmente — menos races por diseño.
+- **La misma clase de race puede aparecer en cualquier herramienta que ejecute comandos `bin/console` de Symfony en paralelo** — migraciones, cache clears, imports de fixtures. El patrón es general: cualquier comando de Symfony que toque la cache del contenedor sin un lock externo.
+
+## Lo que ps-lando NO hace (todavía)
+
+- **Sin lock externo** — confiamos en detección + reintento en lugar de un lock alrededor de `prestashop:module install`. Un lock serializaría ese paso y borraría el beneficio del paralelismo.
+- **Sin pre-warm del rebuild de cache** — un único `cache:clear --no-warmup` seguido de un `cache:warmup` antes de los installs paralelos podría evitar el rebuild-durante-install por completo. Considerado, no implementado.
+
+## Relacionado
+
+<Cards>
+  <Card title="Schema drift PS 8.x → 9.x" href="/docs/kb/schema-drift-ps-8-9" description="Otras rarezas del lado de PS que ps-lando rodea." />
+  <Card title="Bug de cache de HTMLPurifier" href="/docs/kb/htmlpurifier-cache-bug" description="La otra trampa del install paralelo." />
+</Cards>

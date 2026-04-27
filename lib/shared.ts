@@ -1,7 +1,7 @@
 export const appName = 'ps-lando';
-export const tagline = 'PrestaShop sandboxes in one command';
+export const tagline = 'Local PrestaShop sandboxes in 6 minutes';
 export const description =
-  'Spin up PrestaShop + Panda + Easy Builder locally with Lando. CLI for local dev with hooks, recipes, and full sandbox lifecycle tooling.';
+  'Spin up local PrestaShop 8 & 9 sandboxes in 6 minutes with ps-lando — a Lando-based CLI. Hooks, recipes, db reset/dump/restore, theme + modules ready.';
 
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';

@@ -1,0 +1,113 @@
+---
+title: Flags
+description: Referencia completa de los flags de create + install-modules, agrupados por propósito.
+---
+
+Todos los flags aceptados por `ps-lando create` y `ps-lando install-modules`, agrupados por lo que controlan.
+
+## Flags de `create`
+
+### Básicos
+
+| Flag | Propósito |
+|---|---|
+| `-y, --yes` | No interactivo, acepta defaults. Apto para CI. |
+| `--ps-version <v>` | Tag de PrestaShop (p. ej. `8.2.5`, `9.1.0`, `9.0.3`). Salta el selector interactivo. El alias legacy `--ps` sigue funcionando. |
+| `--ps-zip <path>` | Usa un zip de PS pre-descargado. Bypassea la red por completo. |
+| `-z, --zips <dir>` | Directorio con los zips de SunnyToo (default: dir del proyecto). |
+| `--hummingbird-build` | Después del install, construye los assets de Hummingbird 2.0 vía un contenedor `node:20` Docker efímero. |
+
+### Selección de módulos
+
+| Flag | Propósito |
+|---|---|
+| `--no-install-modules` | Salta el install batch de módulos `st*` al final de `create`. Los módulos se siguen copiando; ejecuta `ps-lando install-modules` luego. |
+| `--sequential` | Instala los módulos de Panda uno a uno (el default desde 0.4.2 es paralelo concurrencia 3). Más lento, más fácil de debuggear. |
+| `--skip-blog` | (0.5.0+) Salta los 11 módulos de blog. |
+| `--skip-easybuilder` | (0.5.0+) Salta Easy Builder + el puente. También bloquea el paso de copia. |
+| `--skip-social` | (0.5.0+) Salta los 4 módulos sociales. |
+| `--skip-marketing` | (0.5.0+) Salta los 4 módulos de marketing. |
+| `--skip <list>` | (0.5.0+) Nombres de módulos separados por coma para saltarse individualmente. Los nombres desconocidos avisan y siguen. |
+| `--only <list>` | (0.5.0+) Instala SOLO los módulos listados. Mutuamente excluyente con `--skip-*`. Los nombres desconocidos dan error. |
+| `--no-copy-skipped` | (0.5.2+) Junto a `--skip-*` / `--only`, también excluye los módulos filtrados del paso de copia. No-op sin un flag de selección. |
+
+Mira [Selección de módulos](/docs/guides/selecting-modules) para el resumen conceptual y los combos.
+
+### Hooks y recipes
+
+| Flag | Propósito |
+|---|---|
+| `--recipes <names>` | (0.4.0+) Lista separada por comas de recipes incluidas a ejecutar. Se usa en modo `-y`; el modo interactivo muestra un multiselect. |
+| `--on-hook-failure fail\|continue` | (0.4.0+) Si un hook fallido aborta el resto del pipeline (`fail`) o loguea y sigue (`continue`, por defecto). |
+
+Mira [Hooks y recipes](/docs/guides/hooks-and-recipes).
+
+## Flags de `install-modules`
+
+| Flag | Propósito |
+|---|---|
+| `--dry-run` | Previsualiza el orden de install sin invocar PrestaShop. |
+| `--include <prefix>` | Solo instala módulos cuyo nombre empieza por `<prefix>` (p. ej. `stblog`). |
+| `--sequential` | Fuerza install uno a uno (default es paralelo concurrencia 3 desde 0.4.2). |
+| `--skip-blog` / `--skip-easybuilder` / `--skip-social` / `--skip-marketing` | (0.5.0+) Mismos flags de grupo que `create`. |
+| `--skip <list>` | (0.5.0+) Nombres separados por coma a saltarse. |
+| `--only <list>` | (0.5.0+) Instala SOLO los módulos listados. |
+
+## Flags de `db reset`
+
+| Flag | Propósito |
+|---|---|
+| `-y, --yes` | Salta el prompt de confirmación. |
+
+## Flags de `db dump`
+
+| Flag | Propósito |
+|---|---|
+| `--with-files` | Agrupa SQL + `img/` + `themes/<active>/` en un `.tar.gz` en lugar de un `.sql.gz`. |
+
+## Flags de `db restore`
+
+| Flag | Propósito |
+|---|---|
+| `-y, --yes` | Salta el prompt de confirmación. |
+
+## Flags de `doctor`
+
+| Flag | Propósito |
+|---|---|
+| `--fix` | Para cada ítem fallido auto-recuperable, pregunta para aplicar el fix interactivamente. |
+
+## Flags de `activate-theme`
+
+| Flag | Propósito |
+|---|---|
+| `--force-sql` | Salta el intento de consola `prestashop:theme:enable` y va directo al fallback SQL. |
+
+## Exclusiones mutuas
+
+- `--only` es mutuamente excluyente con cualquier forma `--skip-*`. Combinarlos termina con código 2.
+
+## Defaults en modo `-y`
+
+Cuando se pasa `-y` sin otros flags:
+
+| Campo | Default |
+|---|---|
+| Nombre del proyecto | basename del cwd |
+| Versión de PS | la stable más nueva del manifest (actualmente 9.1.0) |
+| PHP | 8.2 (PS 9) o 8.1 (PS 8) |
+| Base de datos | MySQL |
+| Extras | phpMyAdmin + MailHog |
+| Panda | sí si se detecta `panda*.zip` |
+| Tema hijo | sí, llamado `<project>_child` |
+| Easy Builder | sí si `steasybuilder.zip` + `steasy_trans_panda.zip` están los dos presentes |
+| Email admin | `admin@example.com` |
+| Password admin | `sandbox1234` |
+| Locale | `es / es / Europe/Madrid` |
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Referencia de comandos" href="/docs/reference/commands" description="Tabla de comandos de primer nivel." />
+  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="Cuándo usar cada --skip-*." />
+</Cards>

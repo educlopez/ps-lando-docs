@@ -16,16 +16,14 @@ export function CopyCommand({ command }: { command: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="group inline-flex items-center gap-3 rounded-lg border border-fd-border bg-fd-card px-5 py-3 font-mono text-sm hover:border-fd-primary/60 transition"
       aria-label="Copy install command"
+      className="group gb-command relative pr-12 cursor-pointer"
     >
       <span className="text-fd-muted-foreground select-none">$</span>
-      <span>{command}</span>
-      {copied ? (
-        <Check className="size-4 text-brand-500" />
-      ) : (
-        <Copy className="size-4 text-fd-muted-foreground group-hover:text-fd-foreground transition" />
-      )}
+      <span className="text-fd-foreground">{command}</span>
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 size-7 inline-flex items-center justify-center rounded-md text-fd-muted-foreground group-hover:text-fd-foreground group-hover:bg-fd-accent transition">
+        {copied ? <Check className="size-3.5 text-fd-primary" /> : <Copy className="size-3.5" />}
+      </span>
     </button>
   );
 }

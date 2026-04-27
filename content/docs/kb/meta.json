@@ -1,4 +1,4 @@
 {
   "title": "Knowledge base",
-  "pages": []
+  "pages": ["schema-drift-ps-8-9", "symfony-cache-races", "htmlpurifier-cache-bug"]
 }

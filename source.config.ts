@@ -1,8 +1,8 @@
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
 
-// You can customize Zod schemas for frontmatter and `meta.json` here
-// see https://fumadocs.dev/docs/mdx/collections
+// Customize Zod schemas for frontmatter and `meta.json` here.
+// See https://fumadocs.dev/docs/mdx/collections.
 export const docs = defineDocs({
   dir: 'content/docs',
   docs: {
@@ -18,6 +18,13 @@ export const docs = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
-    // MDX options
+    // Shiki syntax highlighting — paired light + dark themes that play
+    // nicely with the mint accent and document-first vibe.
+    rehypeCodeOptions: {
+      themes: {
+        light: 'catppuccin-latte',
+        dark: 'catppuccin-mocha',
+      },
+    },
   },
 });

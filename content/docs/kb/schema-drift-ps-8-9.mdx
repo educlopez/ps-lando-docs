@@ -1,0 +1,101 @@
+---
+title: Schema drift PS 8.x → 9.x
+description: Tables removed, columns removed, strict SQL mode — what changed and how ps-lando handles it.
+---
+
+Discovered while validating the 6 bundled recipes against PS 9.1.0 and PS 8.2.5. This is the diff list any SQL script touching modern PrestaShop should know about.
+
+## Tables eliminated in PS 9.x
+
+- **`ps_customer_shop`** — removed. Customer ↔ shop now via `ps_customer.id_shop` directly. Note: the table also doesn't exist in PS 8.2.5 according to the audit, so it appears it was actually removed before 8.2.x. Don't reference it from new SQL.
+
+## Columns eliminated in PS 9.x
+
+- **`ps_product_lang.meta_keywords`** — removed. Only `meta_title` and `meta_description` remain.
+- **`ps_category_lang.meta_keywords`** — removed. `additional_description` was added.
+- **`ps_cms_lang.meta_keywords`** — removed.
+
+Any `INSERT ... (meta_keywords, ...)` statement against these tables will fail on PS 9.
+
+## Columns added in PS 9.x (NOT NULL)
+
+- **`ps_product.product_type`** — `enum('standard','pack','virtual','combinations','') NOT NULL`. Requires an explicit value in `INSERT`. Use `'standard'` as the safe default.
+
+Note: this column already exists in PS 8.2.5, so it isn't strictly drift unique to 9.x — but it's NOT NULL on both, so any INSERT that omits it will fail on either branch.
+
+## SQL strict mode changes
+
+PS 9.x sandboxes run with `sql_mode` containing `STRICT_TRANS_TABLES` + `NO_ZERO_DATE`. Two practical implications:
+
+### Zero dates are rejected
+
+```sql
+-- This fails on PS 9 with: Incorrect datetime value: '0000-00-00 00:00:00'
+INSERT INTO ps_some_table (date_add) VALUES ('0000-00-00 00:00:00');
+
+-- Use NOW() for NOT NULL columns:
+INSERT INTO ps_some_table (date_add) VALUES (NOW());
+
+-- Or NULL if the column allows it:
+INSERT INTO ps_some_table (date_add) VALUES (NULL);
+```
+
+### `condition` is reserved in strict mode
+
+`condition` is a reserved MySQL keyword under strict mode. If you reference the `condition` column on `ps_product` (or anywhere else), backtick-quote it:
+
+```sql
+-- Fails on PS 9:
+SELECT id_product, condition FROM ps_product;
+
+-- Works:
+SELECT id_product, `condition` FROM ps_product;
+```
+
+## CLI installer bugs we work around
+
+These are PrestaShop install-side bugs that `ps-lando` routes around so your sandbox boots clean.
+
+### PS 8.2.x — purifier cache dirs missing
+
+The PS 8.2.x CLI installer doesn't create `/app/var/cache/prod/purifier/` or `/app/var/cache/dev/purifier/`. Modules with HTMLPurifier (`stbanner`, `stswiper`) fail to install until the dirs exist.
+
+**Mitigation in `ps-lando`**: `runPrestashopCliInstall` (since 0.4.1) creates both dirs with `chown www-data` after the installer runs. Idempotent, applied unconditionally — no-op on PS 9.x where the dirs would normally exist.
+
+Note: the same dirs are also missing on PS 9.1.x (caught during the 0.6.0 doctor smoke). See [HTMLPurifier cache bug](/docs/kb/htmlpurifier-cache-bug) for the full story.
+
+### PS 8.2.x / 9.0.x / 9.1.x — `prestashop:theme:enable` broken
+
+Different errors per branch, same outcome (theme activation fails):
+
+- **PS 8.2.x** → `Cache.SerializerPath` error from a cache serializer regression.
+- **PS 9.0.x** → assumed broken (same Symfony branch as 9.1).
+- **PS 9.1.x** → `Cannot build Language context as no languageId has been defined` — the console kernel doesn't initialise the language context before the theme-enable call.
+
+**Mitigation in `ps-lando`**: `panda.ts` keeps a `THEME_ENABLE_KNOWN_BROKEN` list of version ranges. For any matching version, the CLI skips the native console attempt and goes directly to:
+
+```sql
+UPDATE ps_shop SET theme_name = 'panda' WHERE id_shop = 1;
+```
+
+Followed by a cache wipe. Works on every version we've tested. Revisit when PS publishes 9.2 in case they fix `LanguageContextBuilder`.
+
+## Practical takeaway
+
+When writing a recipe or any SQL script that targets modern PrestaShop:
+
+1. **Don't reference removed columns** — `meta_keywords` on `ps_product_lang`, `ps_category_lang`, `ps_cms_lang`.
+2. **Always include `product_type`** in product inserts (use `'standard'`).
+3. **Never use `'0000-00-00'`** — use `NOW()` or `NULL`.
+4. **Backtick-quote `condition`** in any reference to `ps_product.condition`.
+5. **Use `landoMysql` here-doc style**, not `lando ssh -c 'mysql ... -e "..."'`. The bundled recipes (`recipes/*/run.sh`) are the reference.
+
+The bundled recipes have been validated on both PS 8.2.5 and PS 9.1.0, so they're a working reference for the patterns above.
+
+## Related
+
+<Cards>
+  <Card title="HTMLPurifier cache bug" href="/docs/kb/htmlpurifier-cache-bug" description="The dir-missing bug, in detail." />
+  <Card title="Symfony cache races" href="/docs/kb/symfony-cache-races" description="Parallel install collisions on Symfony's container cache." />
+  <Card title="Recipes catalog" href="/docs/reference/recipes-catalog" description="Reference recipes that follow these conventions." />
+</Cards>

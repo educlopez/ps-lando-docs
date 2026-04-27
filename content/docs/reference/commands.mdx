@@ -1,0 +1,66 @@
+---
+title: Commands
+description: Full reference of every ps-lando command with flags and examples.
+---
+
+This is the canonical command table. For deep dives on what each one does, follow the links to the relevant guide.
+
+## All commands
+
+| Command | What it does |
+|---|---|
+| `create [name]` | Interactive wizard with dynamic PS version picker (since 0.3.0). `-y` for defaults. `--ps-version 9.1.0` to pin a tag. `--ps-zip <path>` for an offline install. `--hummingbird-build` for Hummingbird 2.0 assets. See [First sandbox](/docs/guides/first-sandbox). |
+| `info [path]` | Consolidated summary: URLs, BO creds, active theme, `st*` module count, versions. |
+| `open <target> [path]` | Open URL in browser. Targets: `front` / `bo` (or `admin`) / `phpmyadmin` (or `pma`) / `mail` (or `mailhog`). |
+| `install-modules [path]` | Batch-install the Panda `st*` modules on disk. Alias: `im`. `--dry-run` to preview order. `--include <prefix>` to scope. Since 0.4.2 installs safe groups in parallel; pass `--sequential` for legacy one-at-a-time. Since 0.5.0 supports `--skip-*` / `--only`. See [Selecting modules](/docs/guides/selecting-modules). |
+| `activate-theme <name> [path]` | Switch active theme. Alias: `at`. Falls back to SQL if `prestashop:theme:enable` fails (PS 8.2.x / 9.x bugs). `--force-sql` to skip console attempt. |
+| `list [path]` | Show detected SunnyToo zips in a directory. Alias: `ls`. |
+| `destroy [path]` | `lando destroy` — removes containers + database, keeps files on disk. |
+| `repair [path]` | `lando start` + cache clear on an existing project. Use after reboot or if the BO looks stale. |
+| `hooks <subcommand>` | Manage hooks + bundled recipes. Subcommands: `list`, `run <name>`, `run-all`, `install <name>`. See [Hooks & recipes](/docs/guides/hooks-and-recipes). |
+| `db reset [path]` | (0.6.0+) Drop the DB and re-run install + module install + theme activation. ~3-5 min. Reuses `module_selection` from `.ps-lando.json`. `-y` to skip confirm. See [Sandbox lifecycle](/docs/guides/sandbox-lifecycle). |
+| `db dump [output] [path]` | (0.6.0+) Gzipped MySQL dump. `--with-files` switches to a `.tar.gz` bundle that also includes `img/` and `themes/<active>/`. |
+| `db restore <path> [project]` | (0.6.0+) Auto-detects format (`.sql.gz` → DB only, `.tar.gz` → DB + files). `-y` to skip confirm. |
+| `doctor [path]` | (0.6.0+) Diagnostic checklist with ✓/⚠/✗ per item. `--fix` prompts to auto-recover anything fixable. See [Doctor](/docs/guides/doctor). |
+
+## Targets for `open`
+
+| Alias | Target |
+|---|---|
+| `front` | Front-office (`http://<project>.lndo.site/`) |
+| `bo`, `admin` | Back-office (`http://<project>.lndo.site/<admin_dir>/`) |
+| `phpmyadmin`, `pma` | phpMyAdmin (random port) |
+| `mail`, `mailhog` | MailHog (random port) |
+
+## Subcommands for `hooks`
+
+| Subcommand | What it does |
+|---|---|
+| `hooks list` | Lists discovered scripts in `init-scripts/` + `post-scripts/` and all bundled recipes. |
+| `hooks run <name>` | Runs a bundled recipe by name. |
+| `hooks run-all` | Runs every executable script in `init-scripts/` then `post-scripts/`. |
+| `hooks install <name>` | Copies a bundled recipe into your project's `init-scripts/` (or `post-scripts/`). |
+
+## Aliases at a glance
+
+| Alias | Long form |
+|---|---|
+| `im` | `install-modules` |
+| `at` | `activate-theme` |
+| `ls` | `list` |
+| `pma` | `phpmyadmin` (as `open` target) |
+| `bo` | `admin` (as `open` target) |
+| `mail` | `mailhog` (as `open` target) |
+
+## Environment variables
+
+| Variable | Effect |
+|---|---|
+| `PS_LANDO_NO_UPDATE_CHECK=1` | Skip the silent npm-registry version check on startup. |
+
+## Next steps
+
+<Cards>
+  <Card title="Flags reference" href="/docs/reference/flags" description="Full flag table grouped by category." />
+  <Card title="Recipes catalog" href="/docs/reference/recipes-catalog" description="All bundled recipes in detail." />
+</Cards>

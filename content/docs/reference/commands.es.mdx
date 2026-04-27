@@ -1,0 +1,66 @@
+---
+title: Comandos
+description: Referencia completa de cada comando de ps-lando con flags y ejemplos.
+---
+
+Esta es la tabla canónica de comandos. Para profundizar en lo que hace cada uno, sigue los enlaces a la guía correspondiente.
+
+## Todos los comandos
+
+| Comando | Qué hace |
+|---|---|
+| `create [name]` | Asistente interactivo con selector dinámico de versión de PS (desde 0.3.0). `-y` para defaults. `--ps-version 9.1.0` para fijar un tag. `--ps-zip <path>` para un install offline. `--hummingbird-build` para los assets de Hummingbird 2.0. Mira [Primer sandbox](/docs/guides/first-sandbox). |
+| `info [path]` | Resumen consolidado: URLs, credenciales del BO, tema activo, cuenta de módulos `st*`, versiones. |
+| `open <target> [path]` | Abre URL en el navegador. Targets: `front` / `bo` (o `admin`) / `phpmyadmin` (o `pma`) / `mail` (o `mailhog`). |
+| `install-modules [path]` | Install batch de los módulos `st*` de Panda en disco. Alias: `im`. `--dry-run` para previsualizar el orden. `--include <prefix>` para acotar. Desde 0.4.2 instala los grupos seguros en paralelo; pasa `--sequential` para uno-a-uno legacy. Desde 0.5.0 soporta `--skip-*` / `--only`. Mira [Selección de módulos](/docs/guides/selecting-modules). |
+| `activate-theme <name> [path]` | Cambia el tema activo. Alias: `at`. Hace fallback a SQL si `prestashop:theme:enable` falla (bugs de PS 8.2.x / 9.x). `--force-sql` para saltarse el intento por consola. |
+| `list [path]` | Muestra los zips de SunnyToo detectados en un directorio. Alias: `ls`. |
+| `destroy [path]` | `lando destroy` — elimina contenedores + base de datos, mantiene los archivos en disco. |
+| `repair [path]` | `lando start` + cache clear sobre un proyecto existente. Úsalo después de un reinicio o si el BO está raro. |
+| `hooks <subcommand>` | Gestiona hooks + recipes incluidas. Subcomandos: `list`, `run <name>`, `run-all`, `install <name>`. Mira [Hooks y recipes](/docs/guides/hooks-and-recipes). |
+| `db reset [path]` | (0.6.0+) Tira la BD y re-ejecuta install + install de módulos + activación de tema. ~3-5 min. Reutiliza `module_selection` de `.ps-lando.json`. `-y` para saltarte confirm. Mira [Ciclo de vida del sandbox](/docs/guides/sandbox-lifecycle). |
+| `db dump [output] [path]` | (0.6.0+) Dump MySQL gzipped. `--with-files` cambia a un bundle `.tar.gz` que también incluye `img/` y `themes/<active>/`. |
+| `db restore <path> [project]` | (0.6.0+) Auto-detecta formato (`.sql.gz` → solo BD, `.tar.gz` → BD + files). `-y` para saltarte confirm. |
+| `doctor [path]` | (0.6.0+) Checklist diagnóstico con ✓/⚠/✗ por ítem. `--fix` pregunta para auto-recuperar lo que sea recuperable. Mira [Doctor](/docs/guides/doctor). |
+
+## Targets para `open`
+
+| Alias | Target |
+|---|---|
+| `front` | Front-office (`http://<project>.lndo.site/`) |
+| `bo`, `admin` | Back-office (`http://<project>.lndo.site/<admin_dir>/`) |
+| `phpmyadmin`, `pma` | phpMyAdmin (puerto aleatorio) |
+| `mail`, `mailhog` | MailHog (puerto aleatorio) |
+
+## Subcomandos de `hooks`
+
+| Subcomando | Qué hace |
+|---|---|
+| `hooks list` | Lista los scripts descubiertos en `init-scripts/` + `post-scripts/` y todas las recipes incluidas. |
+| `hooks run <name>` | Ejecuta una recipe incluida por nombre. |
+| `hooks run-all` | Ejecuta cada script ejecutable en `init-scripts/` y luego `post-scripts/`. |
+| `hooks install <name>` | Copia una recipe incluida en el `init-scripts/` (o `post-scripts/`) de tu proyecto. |
+
+## Aliases de un vistazo
+
+| Alias | Forma larga |
+|---|---|
+| `im` | `install-modules` |
+| `at` | `activate-theme` |
+| `ls` | `list` |
+| `pma` | `phpmyadmin` (como target de `open`) |
+| `bo` | `admin` (como target de `open`) |
+| `mail` | `mailhog` (como target de `open`) |
+
+## Variables de entorno
+
+| Variable | Efecto |
+|---|---|
+| `PS_LANDO_NO_UPDATE_CHECK=1` | Salta la comprobación silenciosa de versión contra el registro de npm en el arranque. |
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Referencia de flags" href="/docs/reference/flags" description="Tabla completa de flags agrupados por categoría." />
+  <Card title="Catálogo de recipes" href="/docs/reference/recipes-catalog" description="Todas las recipes incluidas en detalle." />
+</Cards>

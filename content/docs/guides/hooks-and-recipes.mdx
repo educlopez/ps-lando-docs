@@ -1,0 +1,138 @@
+---
+title: Hooks & recipes
+description: Automate seed data, taxes, cache warmup, and project-specific customisations.
+---
+
+Since **0.4.0**, `ps-lando` ships with a lightweight hooks mechanism so you can automate project-specific customisations (seed data, tax rules, cache warm-up, etc.) without forking the CLI.
+
+## How it works
+
+Two convention folders live at the root of any ps-lando project:
+
+| Folder | When it runs |
+|---|---|
+| `init-scripts/` | After `install-modules`, before the smoke test. |
+| `post-scripts/` | After the smoke test, before the outro. |
+
+Drop any executable `*.sh` file in there. Scripts run in lexicographic order — prefix with `01-`, `02-`... for control. Non-executable files and non-`.sh` files are ignored.
+
+## Env vars injected into hooks
+
+Every script receives this canonical bundle:
+
+```bash
+PS_LANDO_PROJECT        # e.g. my-shop
+PS_LANDO_DOMAIN         # e.g. my-shop.lndo.site
+PS_LANDO_ADMIN_DIR      # e.g. admin233kcmq1wuumt38aojg (randomized)
+PS_LANDO_ADMIN_EMAIL    # e.g. admin@example.com
+PS_LANDO_PS_VERSION     # e.g. 9.1.0
+PS_LANDO_PROJECT_DIR    # absolute path to the project
+PS_LANDO_RECIPE_DIR     # only set for bundled recipes — path to recipes/<name>/
+```
+
+By default, if a script fails the CLI logs a warning and continues. Pass `--on-hook-failure fail` to abort at the first failure.
+
+## Bundled recipes
+
+`ps-lando` ships 6 recipes out of the box. Discover them with:
+
+```bash
+ps-lando hooks list
+```
+
+| Recipe | Phase | Requires | What it does |
+|---|---|---|---|
+| `demo-catalog-10` | init | panda | 10 demo products in a "Demo" category with picsum.photos images. |
+| `demo-customer-with-orders` | init | — | A demo customer + Spain address + 3 orders in different states. |
+| `demo-cms-pages` | init | — | About / Contact / Terms CMS pages in ES + EN. |
+| `spain-taxes` | init | — | ES IVA 21% / 10% / 4% tax rules groups; ES default country + EUR. |
+| `clean-seed` | init | — | Wipes PS built-in demo data (products 1-9, demo customers, images). |
+| `cache-warmup` | post | — | Hits front + BO + category + cart + contact with curl to prime cache. |
+
+See [Recipes catalog](/docs/reference/recipes-catalog) for the per-recipe deep dive (tables touched, idempotency, version compatibility).
+
+## Running recipes
+
+Three ways to apply a recipe:
+
+```bash
+# 1. At create time — interactive multiselect after locale prompts
+ps-lando create
+
+# 2. At create time — non-interactive, pick by name
+ps-lando create -y --recipes spain-taxes,demo-cms-pages
+
+# 3. On an existing sandbox, one at a time
+cd my-shop
+ps-lando hooks run spain-taxes
+ps-lando hooks run demo-cms-pages
+```
+
+## The `hooks` command
+
+Four subcommands:
+
+| Subcommand | What it does |
+|---|---|
+| `ps-lando hooks list` | Lists discovered scripts in `init-scripts/` + `post-scripts/` and all bundled recipes. |
+| `ps-lando hooks run <name>` | Runs a bundled recipe by name (resolves to `recipes/<name>/run.sh`). |
+| `ps-lando hooks run-all` | Runs every executable script in `init-scripts/` then `post-scripts/`. Useful after `db reset` if you want to re-seed. |
+| `ps-lando hooks install <name>` | Copies a bundled recipe into your project's `init-scripts/` (or `post-scripts/` if it's phase `post`) so every fresh `create` applies it automatically. |
+
+Example — install the Spain taxes recipe as a project-local hook:
+
+```bash
+ps-lando hooks install spain-taxes
+# Creates: init-scripts/50-spain-taxes/run.sh
+
+ps-lando hooks install spain-taxes --prefix 10
+# Creates: init-scripts/10-spain-taxes/run.sh — runs earlier
+```
+
+## On-failure policy
+
+```bash
+ps-lando create --on-hook-failure fail
+```
+
+| Value | Behaviour |
+|---|---|
+| `continue` (default) | Log a warning, keep running the rest of the pipeline. |
+| `fail` | Abort `create` at the first failing hook. |
+
+## Writing your own recipe
+
+Any executable `*.sh` in `init-scripts/` or `post-scripts/` is automatically picked up. Example — seed a custom employee group:
+
+```bash
+# init-scripts/10-custom-group.sh
+#!/usr/bin/env bash
+set -eu
+cd "$PS_LANDO_PROJECT_DIR"
+
+lando ssh -s appserver -c "mysql -hdatabase -ulamp -plamp lamp" <<SQL
+INSERT IGNORE INTO ps_group
+  (reduction, price_display_method, show_prices, date_add, date_upd)
+VALUES
+  (0, 0, 1, NOW(), NOW());
+SQL
+```
+
+Don't forget the executable bit:
+
+```bash
+chmod +x init-scripts/10-custom-group.sh
+```
+
+It will now run on every `ps-lando create` from this directory.
+
+<Callout type="info">
+Use `landoMysql` style here-docs (piping SQL via stdin) to avoid the nested-quote hell of `lando ssh -c 'mysql ... -e "..."'`. See the bundled recipes in the npm package's `recipes/` dir for working examples.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Recipes catalog" href="/docs/reference/recipes-catalog" description="Each bundled recipe in detail." />
+  <Card title="Sandbox lifecycle" href="/docs/guides/sandbox-lifecycle" description="db reset re-runs your hooks too." />
+</Cards>

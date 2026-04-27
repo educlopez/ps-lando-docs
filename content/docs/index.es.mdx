@@ -1,0 +1,42 @@
+---
+title: Bienvenida
+description: ps-lando levanta un sandbox completo de PrestaShop + Panda + Easy Builder en un solo comando.
+---
+
+`ps-lando` es una CLI para desarrollo local de PrestaShop. Envuelve Lando (que envuelve Docker) y añade las piezas que un desarrollador de [Panda](https://addons.prestashop.com/) realmente necesita:
+
+- Descarga PrestaShop desde el CDN oficial (PS 9.x) o desde GitHub Releases (PS 8.x).
+- Extrae el zip del tema Panda y copia todos los módulos `st*`.
+- Ejecuta el instalador CLI de PrestaShop con valores por defecto sensatos.
+- Instala cada módulo de Panda en lotes paralelos respetando dependencias.
+- Opcionalmente ejecuta scripts de hooks y recipes incluidas.
+- Proporciona comandos completos del ciclo de vida del sandbox: `db reset`, `db dump`, `db restore`, `doctor`.
+
+Si alguna vez has perdido una tarde instalando PrestaShop, arrastrando zips, configurando Lando y reinstalando módulos uno a uno — `ps-lando` es para ti.
+
+## Empezar
+
+<Cards>
+  <Card title="Quickstart" href="/docs/getting-started/quickstart" description="Levanta tu primer sandbox en 5 minutos." />
+  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="Instala solo lo que tu cliente necesita — omite el blog, Easy Builder o elige por nombre." />
+  <Card title="Recipes" href="/docs/guides/hooks-and-recipes" description="6 recipes incluidas para datos demo, IVA español, cache warmup y más." />
+  <Card title="Ciclo de vida del sandbox" href="/docs/guides/sandbox-lifecycle" description="Reset, dump, restore y diagnóstico — mantén tu sandbox sano." />
+</Cards>
+
+## Compatibilidad
+
+`ps-lando` está validado contra:
+
+- **PrestaShop 8.2.x** — vía zip de GitHub Releases.
+- **PrestaShop 9.0.x** — vía CDN oficial (esperado OK; no probado directamente).
+- **PrestaShop 9.1.x** — vía CDN oficial.
+
+Las dos ramas con **tema Panda + Easy Builder + 56 módulos `st*`**.
+
+Mira la [Matriz de compatibilidad](/docs/reference/compatibility-matrix) para el desglose completo.
+
+## Por qué existe ps-lando
+
+La documentación de PrestaShop asume que vas a hacer clic en un asistente, soltar zips a mano y pulsar "instalar" en cada módulo del back-office. Eso está bien para una instalación puntual. Deja de estar bien cuando empiezas un proyecto nuevo cada dos semanas, cada uno con su propia variante del tema Panda.
+
+`ps-lando` existe para que las partes aburridas de ese ciclo desaparezcan. Sueltas tus zips, ejecutas un comando y empiezas a trabajar en lo que importa — la personalización real para tu cliente.

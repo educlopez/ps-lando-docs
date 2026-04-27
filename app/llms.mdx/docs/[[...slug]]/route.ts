@@ -3,9 +3,14 @@ import { notFound } from 'next/navigation';
 
 export const revalidate = false;
 
-export async function GET(_req: Request, { params }: RouteContext<'/llms.mdx/docs/[[...slug]]'>) {
+export async function GET(
+  _req: Request,
+  { params }: RouteContext<'/llms.mdx/docs/[[...slug]]'>,
+) {
   const { slug } = await params;
-  const page = source.getPage(slug?.slice(0, -1));
+  // Default to EN; this route is locale-agnostic by design (clients that
+  // want ES can use /es/docs/<slug>.mdx via the proxy rewrite).
+  const page = source.getPage(slug?.slice(0, -1), 'en');
   if (!page) notFound();
 
   return new Response(await getLLMText(page), {
@@ -16,7 +21,7 @@ export async function GET(_req: Request, { params }: RouteContext<'/llms.mdx/doc
 }
 
 export function generateStaticParams() {
-  return source.getPages().map((page) => ({
+  return source.getPages('en').map((page) => ({
     lang: page.locale,
     slug: getPageMarkdownUrl(page).segments,
   }));

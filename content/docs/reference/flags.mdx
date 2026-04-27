@@ -1,0 +1,113 @@
+---
+title: Flags
+description: Full reference of create + install-modules flags, grouped by purpose.
+---
+
+Every flag accepted by `ps-lando create` and `ps-lando install-modules`, grouped by what it controls.
+
+## `create` flags
+
+### Basic
+
+| Flag | Purpose |
+|---|---|
+| `-y, --yes` | Non-interactive, accept defaults. CI-friendly. |
+| `--ps-version <v>` | PrestaShop tag (e.g. `8.2.5`, `9.1.0`, `9.0.3`). Skips the interactive picker. Legacy `--ps` alias still works. |
+| `--ps-zip <path>` | Use a pre-downloaded PS zip. Bypasses the network entirely. |
+| `-z, --zips <dir>` | Directory with SunnyToo zips (default: project dir). |
+| `--hummingbird-build` | After install, build Hummingbird 2.0 assets via an ephemeral `node:20` Docker container. |
+
+### Module selection
+
+| Flag | Purpose |
+|---|---|
+| `--no-install-modules` | Skip the batch `st*` module install at the end of `create`. Modules are still copied; run `ps-lando install-modules` later. |
+| `--sequential` | Install Panda modules one at a time (default since 0.4.2 is parallel concurrency 3). Slower, easier to debug. |
+| `--skip-blog` | (0.5.0+) Skip the 11 blog modules. |
+| `--skip-easybuilder` | (0.5.0+) Skip Easy Builder + bridge. Also blocks the copy step. |
+| `--skip-social` | (0.5.0+) Skip the 4 social modules. |
+| `--skip-marketing` | (0.5.0+) Skip the 4 marketing modules. |
+| `--skip <list>` | (0.5.0+) Comma-separated module names to skip individually. Unknown names warn and continue. |
+| `--only <list>` | (0.5.0+) Install ONLY the listed modules. Mutually exclusive with `--skip-*`. Unknown names error out. |
+| `--no-copy-skipped` | (0.5.2+) When paired with `--skip-*` / `--only`, also exclude filtered modules from the copy step. No-op without a selection flag. |
+
+See [Selecting modules](/docs/guides/selecting-modules) for the conceptual overview and combos.
+
+### Hooks & recipes
+
+| Flag | Purpose |
+|---|---|
+| `--recipes <names>` | (0.4.0+) Comma-separated list of bundled recipes to run. Used in `-y` mode; interactive mode shows a multiselect. |
+| `--on-hook-failure fail\|continue` | (0.4.0+) Whether a failing hook aborts the rest of the pipeline (`fail`) or logs and keeps going (`continue`, default). |
+
+See [Hooks & recipes](/docs/guides/hooks-and-recipes).
+
+## `install-modules` flags
+
+| Flag | Purpose |
+|---|---|
+| `--dry-run` | Preview install order without invoking PrestaShop. |
+| `--include <prefix>` | Only install modules whose name starts with `<prefix>` (e.g. `stblog`). |
+| `--sequential` | Force one-at-a-time install (default is parallel concurrency 3 since 0.4.2). |
+| `--skip-blog` / `--skip-easybuilder` / `--skip-social` / `--skip-marketing` | (0.5.0+) Same group flags as `create`. |
+| `--skip <list>` | (0.5.0+) Comma-separated names to skip. |
+| `--only <list>` | (0.5.0+) Install ONLY the listed modules. |
+
+## `db reset` flags
+
+| Flag | Purpose |
+|---|---|
+| `-y, --yes` | Skip the confirm prompt. |
+
+## `db dump` flags
+
+| Flag | Purpose |
+|---|---|
+| `--with-files` | Bundle SQL + `img/` + `themes/<active>/` into a `.tar.gz` instead of a `.sql.gz`. |
+
+## `db restore` flags
+
+| Flag | Purpose |
+|---|---|
+| `-y, --yes` | Skip the confirm prompt. |
+
+## `doctor` flags
+
+| Flag | Purpose |
+|---|---|
+| `--fix` | For each failing item that's auto-recoverable, prompt to apply the fix interactively. |
+
+## `activate-theme` flags
+
+| Flag | Purpose |
+|---|---|
+| `--force-sql` | Skip the `prestashop:theme:enable` console attempt and go directly to the SQL fallback. |
+
+## Mutual exclusions
+
+- `--only` is mutually exclusive with every `--skip-*` form. Combining them exits with code 2.
+
+## Defaults in `-y` mode
+
+When `-y` is passed without other flags:
+
+| Field | Default |
+|---|---|
+| Project name | basename of cwd |
+| PS version | newest stable from the manifest (currently 9.1.0) |
+| PHP | 8.2 (PS 9) or 8.1 (PS 8) |
+| Database | MySQL |
+| Extras | phpMyAdmin + MailHog |
+| Panda | yes if `panda*.zip` detected |
+| Child theme | yes, named `<project>_child` |
+| Easy Builder | yes if `steasybuilder.zip` + `steasy_trans_panda.zip` both present |
+| Admin email | `admin@example.com` |
+| Admin password | `sandbox1234` |
+| Locale | `es / es / Europe/Madrid` |
+
+## Next steps
+
+<Cards>
+  <Card title="Commands reference" href="/docs/reference/commands" description="Top-level command table." />
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="When to use each --skip-*." />
+</Cards>
