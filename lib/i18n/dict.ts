@@ -177,7 +177,7 @@ export const dict: Record<Locale, Dict> = {
   en: {
     announcement: {
       pill: 'New',
-      body: 'v0.6.0 — sandbox lifecycle commands shipped',
+      body: 'v1.0.0-rc.1 — zero-config, open to any theme',
     },
     nav: {
       docs: 'Docs',
@@ -193,11 +193,11 @@ export const dict: Record<Locale, Dict> = {
       es: 'ES',
     },
     hero: {
-      pill: 'New · db reset, dump, restore, doctor',
+      pill: 'New · v1.0 zero-config, open to any theme',
       titleLine1: 'Local PrestaShop sandboxes,',
       titleLine2: 'in one command.',
       description:
-        'From npm install to a working PrestaShop 8 or 9 store in 6 minutes — no wizard, no manual SQL.',
+        'Drop any theme zip, run one command, and you have a working PrestaShop 8 or 9 store in 6 minutes — zero-config, no wizard, no manual SQL.',
       ctaPrimary: 'Get started',
       ctaSecondary: 'View on GitHub',
       tabs: { docs: 'Docs', install: 'Install', diagnose: 'Diagnose' },
@@ -216,7 +216,7 @@ export const dict: Record<Locale, Dict> = {
         eyebrow: 'Module selection',
         title: 'Only the modules your client needs.',
         caption:
-          '56 vetted modules grouped into batches you toggle from a single .ps-lando.json file.',
+          'Filter modules with --exclude / --only globs from the CLI, or pin them in pslando.config.json.',
       },
       doctor: {
         eyebrow: 'Doctor',
@@ -398,7 +398,7 @@ export const dict: Record<Locale, Dict> = {
   es: {
     announcement: {
       pill: 'Nuevo',
-      body: 'v0.6.0 — comandos del ciclo de vida del sandbox ya disponibles',
+      body: 'v1.0.0-rc.1 — zero-config, abierto a cualquier tema',
     },
     nav: {
       docs: 'Docs',
@@ -414,11 +414,11 @@ export const dict: Record<Locale, Dict> = {
       es: 'ES',
     },
     hero: {
-      pill: 'Nuevo · db reset, dump, restore, doctor',
+      pill: 'Nuevo · v1.0 zero-config, abierto a cualquier tema',
       titleLine1: 'Sandboxes de PrestaShop locales,',
       titleLine2: 'en un solo comando.',
       description:
-        'De npm install a una tienda PrestaShop 8 o 9 funcionando en 6 minutos — sin asistente, sin SQL a mano.',
+        'Suelta cualquier zip de tema, ejecuta un comando y tienes una tienda PrestaShop 8 o 9 funcionando en 6 minutos — zero-config, sin asistente, sin SQL a mano.',
       ctaPrimary: 'Empezar',
       ctaSecondary: 'Ver en GitHub',
       tabs: { docs: 'Docs', install: 'Instalar', diagnose: 'Diagnóstico' },
@@ -437,7 +437,7 @@ export const dict: Record<Locale, Dict> = {
         eyebrow: 'Selección de módulos',
         title: 'Solo los módulos que tu cliente necesita.',
         caption:
-          '56 módulos validados agrupados en lotes que activas desde un único .ps-lando.json.',
+          'Filtra módulos con globs --exclude / --only desde la CLI, o fíjalos en pslando.config.json.',
       },
       doctor: {
         eyebrow: 'Doctor',

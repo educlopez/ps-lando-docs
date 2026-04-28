@@ -1,16 +1,19 @@
 ---
 title: Bienvenida
-description: ps-lando levanta un sandbox completo de PrestaShop + Panda + Easy Builder en un solo comando.
+description: ps-lando levanta un sandbox completo de PrestaShop — abierto a cualquier tema — en un solo comando.
 ---
 
-`ps-lando` es una CLI para desarrollo local de PrestaShop. Envuelve Lando (que envuelve Docker) y añade las piezas que un desarrollador de [Panda](https://addons.prestashop.com/) realmente necesita:
+`ps-lando` es una CLI **zero-config** para desarrollo local de PrestaShop. Suelta cualquier zip de tema en una carpeta, ejecuta un comando y tienes un sandbox funcionando. Envuelve Lando (que envuelve Docker) y añade las piezas que cualquier desarrollador de PrestaShop realmente necesita — abierto a cualquier tema, con un preset `panda` incluido para tiendas [Panda](https://addons.prestashop.com/):
 
+- **Abierto a cualquier tema** — auto-detecta el tema desde `theme.yml` en cualquier zip que sueltes en el cwd. Sin binario específico por tema.
 - Descarga PrestaShop desde el CDN oficial (PS 9.x) o desde GitHub Releases (PS 8.x).
-- Extrae el zip del tema Panda y copia todos los módulos `st*`.
+- Extrae el zip del tema y copia los zips de módulos al lado.
 - Ejecuta el instalador CLI de PrestaShop con valores por defecto sensatos.
-- Instala cada módulo de Panda en lotes paralelos respetando dependencias.
-- Opcionalmente ejecuta scripts de hooks y recipes incluidas.
-- Proporciona comandos completos del ciclo de vida del sandbox: `db reset`, `db dump`, `db restore`, `doctor`.
+- Instala cada módulo en lotes paralelos respetando dependencias.
+- Auto-carga el **preset panda** incluido cuando detecta un `panda*.zip` — comportamiento Panda + Easy Builder retrocompatible.
+- Opcionalmente ejecuta scripts de hooks y recipes incluidas (ahora con `PS_LANDO_THEME_NAME`, `PS_LANDO_PRESETS` y un JSON con el plan resuelto en env).
+- `pslando.config.json` opcional (vía `ps-lando init`) para comportamiento explícito y repetible.
+- Comandos completos del ciclo de vida del sandbox: `db reset`, `db dump`, `db restore`, `doctor`.
 
 Si alguna vez has perdido una tarde instalando PrestaShop, arrastrando zips, configurando Lando y reinstalando módulos uno a uno — `ps-lando` es para ti.
 
