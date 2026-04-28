@@ -1,0 +1,86 @@
+---
+title: Changelog
+description: Cambios notables en ps-lando entre releases. Mirror del CHANGELOG.md del repo de la CLI.
+---
+
+Esta página es un mirror del [`CHANGELOG.md`](https://github.com/educlopez/ps-lando/blob/main/CHANGELOG.md) de la CLI. Las entradas siguen [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [1.0.0-rc.1] — TBD
+
+> Primer release candidate de v1.0. Se etiqueta tras el merge de PR-5 y captura del baseline smoke de Cinetic Panda. **No promover a `latest` hasta que el smoke gate haya corrido end-to-end contra la fixture de Cinetic Panda.**
+
+### BREAKING CHANGES
+
+- **`--skip-easybuilder` eliminada.** Usa `--exclude=steasybuilder*` (o pon `modules.exclude` / top-level `exclude` en `pslando.config.json`). La flag legacy ahora termina con exit 64 más un hint de migración de una línea.
+- **`--skip-blog` eliminada.** Usa `--exclude=stblog*` (o vía configuración de grupos del preset panda). Mismo comportamiento exit-64 + hint.
+- **`--skip-social` eliminada.** Usa patrones `--exclude=<glob>` o config de preset. Exit 64 + hint.
+- **`--skip-marketing` eliminada.** Usa patrones `--exclude=<glob>` o config de preset. Exit 64 + hint.
+
+Las cuatro flags eliminadas eran filtros de grupo hardcodeados en el flujo Panda de v0.6. v1.0 las reemplaza por el `--exclude` glob genérico (repetible, picomatch, case-insensitive, soporta `!negación`) que compone con `--only` y se llama igual desde flags CLI o desde `pslando.config.json` (top-level `exclude` o `modules.exclude`).
+
+El exit code 64 (`UsageError`) es la señal canónica de "tu uso de la CLI está mal". Cada flag eliminada emite el hint exacto a stderr antes de salir; sin efectos en FS ni en lando.
+
+Mira [Migración desde 0.x](/docs/kb/migrating-from-0.x) para una guía paso a paso.
+
+### Añadido
+
+- **`ps-lando init`** — asistente interactivo (clack, 7 prompts) que escribe `pslando.config.json`, un `init-scripts/01-example.sh` de ejemplo (chmod +x, solo si el directorio no existe) y añade `.pslando-cache.json` a `.gitignore`. Flags: `--yes` (salta prompts con defaults documentados), `--force` (sobrescribe config existente; si no, rechaza con exit 82). Ctrl-C sale con 0 y `"Init cancelled — no files written."`.
+- **`--exclude=<glob>`** (repetible, en `create` e `install-modules`) — glob picomatch, case-insensitive. Compone con `--only`. El valor CLI REEMPLAZA el `exclude` de `pslando.config.json` (no concatena).
+- **`--theme=<name|path|none>`** — override explícito de tema. `name` matchea zip detectado / `theme.yml`. `path` acaba en `.zip`. `none` descarta el deployment del tema entero.
+- **`--preset=<name>`** (repetible) — carga un preset específico (`panda`, `none`, o ruta relativa como `./presets/foo.ts`).
+- **`--no-preset`** — desactiva todos los presets, incluso los auto-detectados.
+- **Preset `panda` incluido** — encapsula el flujo Panda v0.6 (4 grupos de módulos, warning del bridge EB, prioridad INFRA + STBLOG_PARENT, scaffolding de child theme). Auto-detectado cuando hay un `panda*.zip` en cwd. Desactivable con `--no-preset` o `presets: []` en config.
+- **`pslando.config.{json,ts,js}`** — archivo de config descubierto por cosmiconfig, validado con zod. Configs TS se cargan lazy con `jiti`. `--config=<path>` corta el descubrimiento. Errores de validación lanzan `ConfigSchemaError` (exit 65).
+- **Resolver de plan en 5 capas** — defaults < preset auto-detect < config < CLI < env. Los arrays REEMPLAZAN (no concatenan). Devuelve un `ResolvedPlan` con `Provenance<T>` por campo para que el log de decisiones resueltas pueda mostrar DE DÓNDE viene cada valor.
+- **Log de decisiones resueltas en stderr** — un bloque por invocación de `create`, texto o JSON. Controlado por `--log-format` / `PSLANDO_LOG_FORMAT` / config `logFormat`.
+- **Migración del esquema `.ps-lando.json` 0 → 1** — la lectura tolera todas las shapes de v0.6; las escrituras siempre emiten `schema: 1` más todos los campos v1 más los mirrors legacy para que un install de ps-lando v0.6 siga leyendo el archivo.
+- **Event bus tipado** — 4 eventos v1.0 (`plan-resolved`, `step-start`, `step-end`, `error`) para telemetría futura.
+- **`--force-overwrite-theme`, `--allow-stock-overwrite`, `--allow-incompat-theme`, `--strict-compat`, `--config`, `--no-cache`, `--log-format`** conectadas en `create`.
+- **4 env vars nuevas en hooks** — `PS_LANDO_THEME_NAME`, `PS_LANDO_PRESETS`, `PS_LANDO_MODULES_INSTALLED` (solo post), `PS_LANDO_RESOLVED_PLAN_JSON` (con fallback `@<filepath>` cuando supera 32KB).
+
+### Cambiado
+
+- **Layout de tests** — `tests/` → `tests/unit/`. Proyecto smoke en `tests/smoke/` gatekeeped por `PSLANDO_SMOKE=1` (`pnpm test:smoke`).
+- **Deployment de tema** — extraídos `findThemeRoot` y `deployTheme` (theme-agnostic) a `src/lib/theme.ts`. Acepta `config/theme.yml` y el legacy PS 1.6 `config/theme.xml`. Ignora `__MACOSX/` y dotfiles.
+- **Shape de detección** — `DetectedZips` generalizado de la forma panda-específica `{ panda, easybuilder, transPanda, otherModules }` a la genérica `{ themes, modules, unknown, warnings }` de `ZipClassification`.
+- **Resolver de deps de módulos** — prioridades INFRA + STBLOG_PARENT salieron de `module-deps.ts` y se metieron en `contributeDepEdges()` del preset panda. El graph de install ahora pliega edges del preset. El flujo Panda queda byte-equivalente a v0.6.
+
+### Paridad Cinetic Panda
+
+- El flujo por defecto (`ps-lando create -y` con `panda*.zip` + `steasybuilder*` + `steasy_trans_panda*` zips en cwd, sin flags CLI, sin config) produce la MISMA extracción `themes/panda/`, el MISMO set de módulos `st*` instalados y el MISMO bloque byte-a-byte `module_selection` en `.ps-lando.json` que v0.6.0.
+
+## [0.6.0] — 2026-04-25
+
+### Añadido
+
+- **`ps-lando db reset`** — tira la BD del sandbox y re-ejecuta el instalador CLI + install de módulos + activación de tema. ~3-5 min vs ~6 min de un `create` completo. Reusa parámetros y `module_selection` de `.ps-lando.json`.
+- **`ps-lando db dump [output]`** — dump MySQL gzipped. `--with-files` emite un `.tar.gz` que incluye `img/` + `themes/<active>/`. `modules/` se excluye intencionalmente.
+- **`ps-lando db restore <path>`** — auto-detecta formato por extensión (`.sql.gz` → solo BD, `.tar.gz` → BD + files).
+- **`ps-lando doctor`** — checklist diagnóstico. `--fix` pregunta para aplicar fixes auto-recuperables interactivamente.
+- **`module_selection` persistido en `.ps-lando.json`** para que `db reset` reaplique el mismo filtrado.
+
+## [0.5.x] — 2026-04-24/25
+
+### 0.5.2
+
+- **Flag `--no-copy-skipped` en `create`** — junto a una flag de selección, evita que los módulos filtrados se copien a `modules/`.
+
+### 0.5.1
+
+- **Reintento de race de cache de Symfony de 1 a 3 intentos** con backoff exponencial (500ms, 1500ms, 3000ms).
+
+### 0.5.0
+
+- **Grupos de módulos + flags `--skip-*` / `--only`** — cuatro grupos hardcodeados (`blog`, `easybuilder`, `social`, `marketing`). _(Eliminadas en 1.0.0 — ver migración.)_
+- **Cache unificado en `~/.cache/ps-lando/`** (XDG-compliant) con migración silenciosa de layouts pre-0.5.
+- **Multiselect interactivo de módulos en `create`** — `All modules` / `Core only` / `Custom...`.
+
+## [0.4.x] — 2026-04-24
+
+- **0.4.2**: Install de módulos en paralelo (concurrencia 3 por defecto). `--sequential` como salida de emergencia. Auto-retry de race de cache de Symfony.
+- **0.4.1**: Auto-creación de directorios de cache de HTMLPurifier post-instalador CLI (recovery PS 8.2.x).
+- **0.4.0**: Hooks + recipes incluidas (`spain-taxes`, `demo-catalog-10`, `demo-customer-with-orders`, `demo-cms-pages`, `clean-seed`, `cache-warmup`).
+
+## Releases anteriores
+
+Para 0.3.x y anteriores, mira el [`CHANGELOG.md`](https://github.com/educlopez/ps-lando/blob/main/CHANGELOG.md) en GitHub.
