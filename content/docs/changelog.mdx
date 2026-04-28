@@ -5,7 +5,43 @@ description: Notable changes to ps-lando across releases. Mirrored from CHANGELO
 
 This page mirrors the [`CHANGELOG.md`](https://github.com/educlopez/ps-lando/blob/main/CHANGELOG.md) of the CLI. Entries follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.0-rc.1] — TBD
+## [1.0.0-rc.2] — 2026-04-27
+
+> Second release candidate. Wires the v1 generic detection / preset machinery into the runtime, fixes a stock-modules regression, and turns theme + module selection into explicit prompts. **Validated against Panda 2.9.2, Leo Classic, and Hummingbird** — see [Theme compatibility matrix](/docs/kb/theme-compatibility).
+
+### Added
+
+- **Generic detection wired into `pslando list`.** The list command now shows three new sections — Themes / Modules / Unknown — alongside the Panda summary. Any zip with `config/theme.{xml,yml}` at depth 0 or 1 classifies as a theme; any zip with `<name>/config.xml` classifies as a module.
+- **Agnostic theme `select` prompt** in `pslando create` — when 1+ themes are detected the CLI shows a clack `select` listing each theme name plus a `None` option. With `-y`: 1 theme = auto-selected, 2+ = exit 2 (`AmbiguousThemeError`) with a hint to pass `--theme=<name>`.
+- **Module `multiselect` prompt** in `pslando create` — every detected module zip is pre-checked; uncheck what you don't want. With `-y`: all auto-checked.
+- **Preset binding by selected theme name.** A preset whose name matches the selected theme name activates automatically. Picking `panda` activates the bundled `panda` preset; picking any other theme (or `None`) activates none. `--no-preset` and `--preset=<name>` override.
+- **Empty-folder fallback.** Running `pslando create` in a folder with no zips skips both prompts and produces a vanilla PS install with the bundled `classic` / `hummingbird` themes.
+
+### Changed
+
+- **`pslando install-modules` (standalone) only scans modules/ when explicitly asked.** Without `--include=<prefix>` (or implicit Panda flow via `pslando create`), the command now prints "nothing to do" and exits 0. Pass `--include=st` to scan or `--only=name1,name2` to install specific modules. This fixes the rc.1 regression where running `pslando install-modules` on a fresh sandbox would re-install PS-bundled stock modules.
+- **`pslando create` no longer accidentally re-installs PS-bundled modules.** Only the module zips the user dropped in cwd are considered for install.
+- **Resolved-decisions log uses the canonical `detectAllZips` view.** Themes detected via `config/theme.yml` (e.g. Falcon) now appear under `themes:` in the log, not `unknown:`.
+
+### Fixed
+
+- **Cosmetic: "install step errored" final summary** now says "no modules to install" when the install step was actually skipped (not errored).
+- **Module install reclassifies via DB `ps_module.active`.** Deprecated `unlink` warnings on PS 9.1 no longer count as a failure if the module ends up active in the database.
+
+### Cinetic Panda parity
+
+Preserved byte-for-byte through the new prompts seam: the `-y` flow with `panda*.zip` + `steasybuilder*` + `steasy_trans_panda*` zips in cwd auto-selects `panda` as the theme, auto-checks all detected modules, activates the bundled `panda` preset by name match, and produces the same `themes/panda/` extraction + `module_selection` block as v0.6.
+
+### Smoke matrix
+
+| Theme | Result |
+|---|---|
+| Panda 2.9.2 (Cinetic) | ✅ Front 200, 55/56 modules active |
+| Leo Classic 2025 | ✅ Front 200, generic deploy |
+| Hummingbird (PS bundled) | ✅ Front 200 |
+| Falcon 3.1.2 | ⚠ Front 500 — PS 8.x theme on PS 9.1 (theme issue, not CLI). See [theme-compatibility](/docs/kb/theme-compatibility). |
+
+## [1.0.0-rc.1] — 2026-04-26
 
 > First release candidate of v1.0. Tagged after PR-5 lands and the Cinetic Panda smoke baseline is captured. **Do not promote to `latest` until the smoke gate has run end-to-end against the Cinetic Panda fixture.**
 

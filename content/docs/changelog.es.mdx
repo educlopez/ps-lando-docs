@@ -5,7 +5,43 @@ description: Cambios notables en ps-lando entre releases. Mirror del CHANGELOG.m
 
 Esta página es un mirror del [`CHANGELOG.md`](https://github.com/educlopez/ps-lando/blob/main/CHANGELOG.md) de la CLI. Las entradas siguen [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.0-rc.1] — TBD
+## [1.0.0-rc.2] — 2026-04-27
+
+> Segundo release candidate. Conecta la maquinaria de detección genérica / presets v1 al runtime, arregla una regresión de módulos stock y convierte la selección de tema + módulos en prompts explícitos. **Validado contra Panda 2.9.2, Leo Classic y Hummingbird** — mira la [Matriz de compatibilidad de temas](/docs/kb/theme-compatibility).
+
+### Añadido
+
+- **Detección genérica conectada a `pslando list`.** Ahora el comando list muestra tres secciones nuevas — Themes / Modules / Unknown — junto al resumen de Panda. Cualquier zip con `config/theme.{xml,yml}` a profundidad 0 o 1 clasifica como tema; cualquier zip con `<name>/config.xml` clasifica como módulo.
+- **Prompt agnóstico `select` de tema** en `pslando create` — cuando se detectan 1+ temas, la CLI muestra un `select` (clack) con cada nombre de tema más una opción `None`. Con `-y`: 1 tema = auto-seleccionado, 2+ = exit 2 (`AmbiguousThemeError`) con hint para pasar `--theme=<name>`.
+- **Prompt `multiselect` de módulos** en `pslando create` — cada zip de módulo detectado va pre-marcado; desmarca lo que no quieras. Con `-y`: todos auto-marcados.
+- **Binding de preset por nombre del tema seleccionado.** Un preset cuyo nombre coincida con el del tema seleccionado se activa automáticamente. Elegir `panda` activa el preset `panda` incluido; elegir cualquier otro tema (o `None`) no activa ninguno. `--no-preset` y `--preset=<name>` lo sobrescriben.
+- **Fallback de carpeta vacía.** Ejecutar `pslando create` en una carpeta sin zips se salta ambos prompts y produce un install vanilla de PS con los temas `classic` / `hummingbird` incluidos.
+
+### Cambiado
+
+- **`pslando install-modules` (standalone) solo escanea modules/ si se le pide explícitamente.** Sin `--include=<prefix>` (o el flujo Panda implícito vía `pslando create`), el comando imprime "nothing to do" y sale 0. Pasa `--include=st` para escanear o `--only=name1,name2` para instalar módulos específicos. Esto arregla la regresión de rc.1 donde `pslando install-modules` en un sandbox recién creado re-instalaba módulos stock pre-instalados de PS.
+- **`pslando create` ya no re-instala accidentalmente módulos pre-instalados de PS.** Solo se consideran para install los zips de módulos que el usuario soltó en cwd.
+- **El log de decisiones resueltas usa la vista canónica `detectAllZips`.** Los temas detectados vía `config/theme.yml` (p. ej. Falcon) ahora aparecen bajo `themes:` en el log, no en `unknown:`.
+
+### Arreglado
+
+- **Cosmético: el resumen final "install step errored"** ahora dice "no modules to install" cuando el paso de install se saltó realmente (no falló).
+- **El install de módulos reclasifica vía DB `ps_module.active`.** Los warnings deprecated de `unlink` en PS 9.1 ya no cuentan como fallo si el módulo termina activo en la base de datos.
+
+### Paridad Cinetic Panda
+
+Preservada byte-for-byte a través de la nueva costura de prompts: el flujo `-y` con `panda*.zip` + `steasybuilder*` + `steasy_trans_panda*` en cwd auto-selecciona `panda` como tema, auto-marca todos los módulos detectados, activa el preset `panda` incluido por coincidencia de nombre y produce la misma extracción `themes/panda/` + bloque `module_selection` que v0.6.
+
+### Matriz de smoke
+
+| Tema | Resultado |
+|---|---|
+| Panda 2.9.2 (Cinetic) | ✅ Front 200, 55/56 módulos activos |
+| Leo Classic 2025 | ✅ Front 200, deploy genérico |
+| Hummingbird (PS incluido) | ✅ Front 200 |
+| Falcon 3.1.2 | ⚠ Front 500 — tema PS 8.x sobre PS 9.1 (problema del tema, no de la CLI). Ver [theme-compatibility](/docs/kb/theme-compatibility). |
+
+## [1.0.0-rc.1] — 2026-04-26
 
 > Primer release candidate de v1.0. Se etiqueta tras el merge de PR-5 y captura del baseline smoke de Cinetic Panda. **No promover a `latest` hasta que el smoke gate haya corrido end-to-end contra la fixture de Cinetic Panda.**
 
