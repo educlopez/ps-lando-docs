@@ -1,8 +1,9 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { appName, githubUrl } from './shared';
+import { githubUrl } from './shared';
 import { getDict } from './i18n/dict';
 import type { Locale } from './i18n';
 import { LangSwitcher } from '@/components/lang-switcher';
+import { BirdIcon } from '@/components/brand-icons';
 
 export function baseOptions(locale: Locale = 'en'): BaseLayoutProps {
   const t = getDict(locale);
@@ -11,8 +12,11 @@ export function baseOptions(locale: Locale = 'en'): BaseLayoutProps {
   return {
     nav: {
       title: (
-        <span className="font-mono text-base tracking-tight">
-          <span className="text-fd-muted-foreground">$</span> {appName}
+        <span className="flex items-center gap-2">
+          <BirdIcon className="size-6 text-fd-primary shrink-0" />
+          <span className="font-semibold tracking-tight text-[15px]">
+            Ps-lando
+          </span>
         </span>
       ),
       url: locale === 'en' ? '/' : `/${locale}`,
