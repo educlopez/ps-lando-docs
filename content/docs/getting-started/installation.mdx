@@ -18,24 +18,43 @@ description: Prerequisites, supported platforms, and what to expect on a first r
 If you have OrbStack installed, you still need Docker Desktop **installed** (it doesn't have to be running) so that `/Applications/Docker.app` exists on disk. Lando's engine check otherwise fails. See [lando/core#138](https://github.com/lando/core/issues/138).
 </Callout>
 
-## Drop any theme zip
+## Drop your zips, pick what to install
 
-Since **1.0.0**, `ps-lando` is **zero-config**: drop any PrestaShop theme zip into a folder, run `ps-lando create`, and the CLI auto-detects the theme via `theme.yml` (or legacy `config.xml`). You no longer need a theme-specific binary or a `--panda` flag.
+Since **1.0.0** (`1.0.0-rc.2`), `ps-lando` is **zero-config and theme-agnostic**: drop your theme + module zips into a folder, run `ps-lando create`, and the CLI walks you through two prompts:
+
+1. **Theme** — `select` prompt listing every theme detected (zip with `config/theme.{yml,xml}` at depth 0 or 1) plus a `None` option.
+2. **Modules** — `multiselect` prompt with every module zip detected (`<name>/<name>.php` or `<name>/config.xml`) pre-checked.
+
+Pick what you want, hit enter, the CLI installs only what you selected. No `--panda` flag, no theme-specific binary, no scanning of PS-bundled modules sneaking in.
 
 | File pattern | What it is | Required? |
 |---|---|---|
-| `*.zip` containing `config/theme.yml` | Any PrestaShop theme zip. | Yes — at least one theme zip (or `--theme=none`). |
-| `st*.zip` / `module-*.zip` | PrestaShop module zips. | Optional — copied/installed if present. |
+| `*.zip` containing `config/theme.{yml,xml}` | Any PrestaShop theme zip. | Optional — you can pick `None` in the prompt for a vanilla install. |
+| `st*.zip` / `module-*.zip` / `<name>.zip` with `<name>/<name>.php` | Any PrestaShop module zip. | Optional — none, one, or many. |
 
-The CLI scans the cwd (or `--zips=<dir>`) and classifies every `*.zip` as theme / module / unknown. Themes are picked by `theme.yml` `name`; modules by `<name>/<name>.php` or `<name>/config.xml` at the zip root. Case-insensitive everywhere.
+The CLI scans the cwd (or `--zips=<dir>`) and classifies every `*.zip` as theme / module / unknown via the bundled zip-classifier. Detection is case-insensitive everywhere.
+
+### Non-interactive (`-y`) defaults
+
+`ps-lando create -y` skips both prompts:
+
+- **1 theme detected** → auto-selected. **2+ themes** → exits 2 (`AmbiguousThemeError`) with a hint to pass `--theme=<name>`.
+- **All detected modules** are auto-checked.
+- **Empty folder** → vanilla PS install with the bundled `classic` / `hummingbird` themes (no prompts shown).
+
+CI scripts that already pass `-y` keep working unchanged.
+
+### Panda happy path
+
+Drop your `panda*.zip` + `steasybuilder*` + `steasy_trans_panda*` zips into the folder, run `ps-lando create`, select `panda` at the theme prompt, leave the module multiselect as-is, hit enter. The bundled **panda preset** activates automatically (it binds to the selected theme name) and you get the same Panda + Easy Builder sandbox the pre-1.0 hard-coded flow produced — byte-equivalent to v0.6.
 
 ### Bundled `panda` preset
 
-When `ps-lando` detects a `panda*.zip` it auto-loads the bundled **panda preset** — the same Panda + Easy Builder behavior pre-1.0 users had hard-coded. The preset adds `steasybuilder` + `steasy_trans_panda` as known group filters and wires the Easy Builder ↔ Panda bridge. Disable with `--no-preset` or `presets: []` in config; force a different preset with `--preset=<name>`.
+`ps-lando` ships a bundled **panda preset** that activates whenever the user selects (or `-y` auto-selects) a theme whose name is `panda` — the same Panda + Easy Builder behavior pre-1.0 users had hard-coded. The preset wires the Easy Builder ↔ Panda bridge and contributes the `blog` / `easybuilder` / `social` / `marketing` group globs. Disable with `--no-preset` or `presets: []` in config; force a different preset with `--preset=<name>`.
 
-| Preset | Auto-loads when | What it does |
+| Preset | Activates when | What it does |
 |---|---|---|
-| `panda` (bundled) | `panda*.zip` is detected in cwd | Adds Easy Builder bridge, group filters (`blog`, `easybuilder`, `social`, `marketing`), `stblog_parent`-style ordering. |
+| `panda` (bundled) | Selected theme name = `panda` | Adds Easy Builder bridge, group filters (`blog`, `easybuilder`, `social`, `marketing`), `stblog_parent`-style ordering. |
 | `none` (bundled) | Never (explicit only) | No-op — useful for `--preset=none` to opt out without `--no-preset`. |
 
 See [Reference → Presets](/docs/reference/presets) for authoring local presets.

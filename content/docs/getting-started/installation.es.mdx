@@ -18,24 +18,43 @@ description: Requisitos previos, plataformas soportadas y qué esperar en la pri
 Si tienes OrbStack instalado, igual necesitas Docker Desktop **instalado** (no hace falta que esté arrancado) para que `/Applications/Docker.app` exista en disco. La comprobación de motor de Lando falla si no. Mira [lando/core#138](https://github.com/lando/core/issues/138).
 </Callout>
 
-## Suelta cualquier zip de tema
+## Suelta tus zips, elige qué instalar
 
-Desde **1.0.0**, `ps-lando` es **zero-config**: suelta cualquier zip de tema de PrestaShop en una carpeta, ejecuta `ps-lando create` y la CLI lo auto-detecta vía `theme.yml` (o el legacy `config.xml`). Ya no necesitas un binario específico para Panda ni la flag `--panda`.
+Desde **1.0.0** (`1.0.0-rc.2`), `ps-lando` es **zero-config y theme-agnostic**: suelta tus zips de tema + módulos en una carpeta, ejecuta `ps-lando create` y la CLI te guía por dos prompts:
+
+1. **Tema** — prompt `select` que lista cada tema detectado (zip con `config/theme.{yml,xml}` a profundidad 0 o 1) más una opción `None`.
+2. **Módulos** — prompt `multiselect` con cada zip de módulo detectado (`<name>/<name>.php` o `<name>/config.xml`) pre-marcado.
+
+Eliges lo que quieres, le das a enter y la CLI instala solo lo seleccionado. Sin flag `--panda`, sin binario específico de tema, sin que se cuelen módulos pre-instalados de PS.
 
 | Patrón | Qué es | ¿Obligatorio? |
 |---|---|---|
-| `*.zip` con `config/theme.yml` | Cualquier zip de tema de PrestaShop. | Sí — al menos un zip de tema (o `--theme=none`). |
-| `st*.zip` / `module-*.zip` | Zips de módulos. | Opcional — se copian/instalan si están presentes. |
+| `*.zip` con `config/theme.{yml,xml}` | Cualquier zip de tema de PrestaShop. | Opcional — puedes elegir `None` en el prompt para un install vanilla. |
+| `st*.zip` / `module-*.zip` / `<name>.zip` con `<name>/<name>.php` | Cualquier zip de módulo PrestaShop. | Opcional — ninguno, uno o muchos. |
 
-La CLI escanea el cwd (o `--zips=<dir>`) y clasifica cada `*.zip` como tema / módulo / desconocido. Los temas se eligen por el `name` de `theme.yml`; los módulos por `<name>/<name>.php` o `<name>/config.xml` en la raíz del zip. Case-insensitive en todo.
+La CLI escanea el cwd (o `--zips=<dir>`) y clasifica cada `*.zip` como tema / módulo / desconocido vía el zip-classifier incluido. Detección case-insensitive en todo.
+
+### Defaults no interactivos (`-y`)
+
+`ps-lando create -y` salta ambos prompts:
+
+- **1 tema detectado** → auto-seleccionado. **2+ temas** → termina con exit 2 (`AmbiguousThemeError`) y un hint para pasar `--theme=<name>`.
+- **Todos los módulos detectados** quedan auto-marcados.
+- **Carpeta vacía** → install vanilla de PS con los temas `classic` / `hummingbird` incluidos (sin prompts).
+
+Los scripts CI que ya pasan `-y` siguen funcionando sin tocar nada.
+
+### Camino feliz Panda
+
+Suelta tus `panda*.zip` + `steasybuilder*` + `steasy_trans_panda*` en la carpeta, ejecuta `ps-lando create`, selecciona `panda` en el prompt de tema, deja el multiselect de módulos como está, dale a enter. El **preset panda** incluido se activa automáticamente (se vincula al nombre del tema seleccionado) y tienes el mismo sandbox Panda + Easy Builder que producía el flujo hard-coded pre-1.0 — byte-equivalente a v0.6.
 
 ### Preset incluido `panda`
 
-Cuando `ps-lando` detecta un `panda*.zip` carga automáticamente el **preset panda** incluido — el mismo comportamiento Panda + Easy Builder que los usuarios pre-1.0 tenían hard-codeado. El preset añade `steasybuilder` + `steasy_trans_panda` como filtros de grupo conocidos y conecta el puente Easy Builder ↔ Panda. Desactívalo con `--no-preset` o `presets: []` en config; fuerza otro con `--preset=<name>`.
+`ps-lando` incluye el **preset panda** que se activa cuando el usuario selecciona (o `-y` auto-selecciona) un tema cuyo nombre es `panda` — el mismo comportamiento Panda + Easy Builder que los usuarios pre-1.0 tenían hard-codeado. El preset conecta el puente Easy Builder ↔ Panda y aporta los globs de grupo `blog` / `easybuilder` / `social` / `marketing`. Desactívalo con `--no-preset` o `presets: []` en config; fuerza otro con `--preset=<name>`.
 
-| Preset | Se carga cuando | Qué hace |
+| Preset | Se activa cuando | Qué hace |
 |---|---|---|
-| `panda` (incluido) | `panda*.zip` se detecta en cwd | Añade el puente Easy Builder, filtros de grupo (`blog`, `easybuilder`, `social`, `marketing`), orden tipo `stblog_parent`. |
+| `panda` (incluido) | El nombre del tema seleccionado es `panda` | Añade el puente Easy Builder, filtros de grupo (`blog`, `easybuilder`, `social`, `marketing`), orden tipo `stblog_parent`. |
 | `none` (incluido) | Nunca (solo explícito) | No-op — útil para `--preset=none` y descartar sin `--no-preset`. |
 
 Ver [Referencia → Presets](/docs/reference/presets) para escribir presets locales.
