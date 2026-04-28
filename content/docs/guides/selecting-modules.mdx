@@ -3,7 +3,7 @@ title: Selecting modules
 description: Use --exclude / --only globs (or pslando.config.json) to filter which modules get installed.
 ---
 
-Since **1.0.0** (`1.0.0-rc.2`), `ps-lando` picks modules in two layers:
+Since **1.0.0** (`1.0.0`), `ps-lando` picks modules in two layers:
 
 1. **Interactive multiselect prompt** during `create` — every module zip detected in the cwd is pre-checked. Untick what you don't want, hit enter, those zips never enter the install graph.
 2. **Glob filters** — `--exclude=<glob>` and `--only=<glob>` (repeatable, picomatch-backed, case-insensitive) for CI / scripts / configs. Both also live in `pslando.config.json`.

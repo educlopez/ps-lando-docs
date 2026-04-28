@@ -177,7 +177,7 @@ export const dict: Record<Locale, Dict> = {
   en: {
     announcement: {
       pill: 'New',
-      body: 'v1.0.0-rc.2 — zero-config, open to any theme',
+      body: 'v1.0.0 — zero-config, open to any theme',
     },
     nav: {
       docs: 'Docs',
@@ -398,7 +398,7 @@ export const dict: Record<Locale, Dict> = {
   es: {
     announcement: {
       pill: 'Nuevo',
-      body: 'v1.0.0-rc.2 — zero-config, abierto a cualquier tema',
+      body: 'v1.0.0 — zero-config, abierto a cualquier tema',
     },
     nav: {
       docs: 'Docs',
