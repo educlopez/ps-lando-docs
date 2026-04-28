@@ -1,0 +1,122 @@
+---
+title: Changelog
+description: Notable changes to ps-lando across releases. Mirrored from CHANGELOG.md in the CLI repo.
+---
+
+This page mirrors the [`CHANGELOG.md`](https://github.com/educlopez/ps-lando/blob/main/CHANGELOG.md) of the CLI. Entries follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [1.0.0] — 2026-04-27
+
+> Second release candidate. Wires the v1 generic detection / preset machinery into the runtime, fixes a stock-modules regression, and turns theme + module selection into explicit prompts. **Validated against Panda 2.9.2, Leo Classic, and Hummingbird** — see [Theme compatibility matrix](/docs/kb/theme-compatibility).
+
+### Added
+
+- **Generic detection wired into `pslando list`.** The list command now shows three new sections — Themes / Modules / Unknown — alongside the Panda summary. Any zip with `config/theme.{xml,yml}` at depth 0 or 1 classifies as a theme; any zip with `<name>/config.xml` classifies as a module.
+- **Agnostic theme `select` prompt** in `pslando create` — when 1+ themes are detected the CLI shows a clack `select` listing each theme name plus a `None` option. With `-y`: 1 theme = auto-selected, 2+ = exit 2 (`AmbiguousThemeError`) with a hint to pass `--theme=<name>`.
+- **Module `multiselect` prompt** in `pslando create` — every detected module zip is pre-checked; uncheck what you don't want. With `-y`: all auto-checked.
+- **Preset binding by selected theme name.** A preset whose name matches the selected theme name activates automatically. Picking `panda` activates the bundled `panda` preset; picking any other theme (or `None`) activates none. `--no-preset` and `--preset=<name>` override.
+- **Empty-folder fallback.** Running `pslando create` in a folder with no zips skips both prompts and produces a vanilla PS install with the bundled `classic` / `hummingbird` themes.
+
+### Changed
+
+- **`pslando install-modules` (standalone) only scans modules/ when explicitly asked.** Without `--include=<prefix>` (or implicit Panda flow via `pslando create`), the command now prints "nothing to do" and exits 0. Pass `--include=st` to scan or `--only=name1,name2` to install specific modules. This fixes the rc.1 regression where running `pslando install-modules` on a fresh sandbox would re-install PS-bundled stock modules.
+- **`pslando create` no longer accidentally re-installs PS-bundled modules.** Only the module zips the user dropped in cwd are considered for install.
+- **Resolved-decisions log uses the canonical `detectAllZips` view.** Themes detected via `config/theme.yml` (e.g. Falcon) now appear under `themes:` in the log, not `unknown:`.
+
+### Fixed
+
+- **Cosmetic: "install step errored" final summary** now says "no modules to install" when the install step was actually skipped (not errored).
+- **Module install reclassifies via DB `ps_module.active`.** Deprecated `unlink` warnings on PS 9.1 no longer count as a failure if the module ends up active in the database.
+
+### Cinetic Panda parity
+
+Preserved byte-for-byte through the new prompts seam: the `-y` flow with `panda*.zip` + `steasybuilder*` + `steasy_trans_panda*` zips in cwd auto-selects `panda` as the theme, auto-checks all detected modules, activates the bundled `panda` preset by name match, and produces the same `themes/panda/` extraction + `module_selection` block as v0.6.
+
+### Smoke matrix
+
+| Theme | Result |
+|---|---|
+| Panda 2.9.2 (Cinetic) | ✅ Front 200, 55/56 modules active |
+| Leo Classic 2025 | ✅ Front 200, generic deploy |
+| Hummingbird (PS bundled) | ✅ Front 200 |
+| Falcon 3.1.2 | ⚠ Front 500 — PS 8.x theme on PS 9.1 (theme issue, not CLI). See [theme-compatibility](/docs/kb/theme-compatibility). |
+
+## [1.0.0-rc.1] — 2026-04-26
+
+> First release candidate of v1.0. Tagged after PR-5 lands and the Cinetic Panda smoke baseline is captured. **Do not promote to `latest` until the smoke gate has run end-to-end against the Cinetic Panda fixture.**
+
+### BREAKING CHANGES
+
+- **`--skip-easybuilder` removed.** Use `--exclude=steasybuilder*` (or set `modules.exclude` / top-level `exclude` in `pslando.config.json`). Running the legacy flag now exits 64 with a one-line migration hint.
+- **`--skip-blog` removed.** Use `--exclude=stblog*` (or via the panda preset's group config). Same exit-64 + hint behavior.
+- **`--skip-social` removed.** Use `--exclude=<glob>` patterns or preset config. Exit 64 + hint.
+- **`--skip-marketing` removed.** Use `--exclude=<glob>` patterns or preset config. Exit 64 + hint.
+
+The four removed flags were group filters baked into the v0.6 Panda flow. v1.0 replaces them with the generic `--exclude` glob (repeatable, picomatch-backed, case-insensitive, supports `!negation`) which composes with `--only` and is equally callable from CLI flags or `pslando.config.json` (top-level `exclude` or `modules.exclude`).
+
+Exit code 64 (`UsageError`) is the canonical "your CLI usage is wrong" signal. Each removed flag emits the exact hint to stderr before exiting; no FS or lando side-effect occurs.
+
+See [Migrating from 0.x](/docs/kb/migrating-from-0.x) for a step-by-step walk-through.
+
+### Added
+
+- **`ps-lando init`** — interactive scaffolder (clack flow, 7 prompts) that writes `pslando.config.json`, an example `init-scripts/01-example.sh` (chmod +x, only when the dir is absent), and appends `.pslando-cache.json` to `.gitignore`. Flags: `--yes` (skip prompts using documented defaults), `--force` (overwrite existing config; otherwise refuses with exit 82). Ctrl-C exits 0 with `"Init cancelled — no files written."`.
+- **`--exclude=<glob>`** (repeatable, on `create` and `install-modules`) — picomatch glob, case-insensitive. Composes with `--only`. CLI value REPLACES `pslando.config.json`'s `exclude` (does not concat).
+- **`--theme=<name|path|none>`** — explicit theme override. `name` matches detected zip / `theme.yml`. `path` ends in `.zip`. `none` opts out of theme deployment entirely.
+- **`--preset=<name>`** (repeatable) — load a specific preset (`panda`, `none`, or a relative path like `./presets/foo.ts`).
+- **`--no-preset`** — disable all presets, including auto-detected ones.
+- **Bundled `panda` preset** — encapsulates the v0.6 Panda flow (4 module groups, EB-bridge warning, INFRA + STBLOG_PARENT priority, child-theme scaffolding). Auto-detected when a `panda*.zip` is present in cwd. Deactivatable via `--no-preset` or `presets: []` in config.
+- **`pslando.config.{json,ts,js}`** — cosmiconfig-discovered, zod-validated config file. TS configs load lazily via `jiti`. `--config=<path>` short-circuits discovery. Validation errors throw `ConfigSchemaError` (exit 65).
+- **5-layer plan resolver** — defaults < preset auto-detect < config < CLI < env. Arrays REPLACE (never concat). Returns a `ResolvedPlan` with `Provenance<T>` per field so the resolved-decisions log can show WHERE each value came from.
+- **Resolved-decisions stderr log** — one block per `create` invocation, text or JSON. Driven by `--log-format` / `PSLANDO_LOG_FORMAT` / config `logFormat`.
+- **`.ps-lando.json` schema 0 → 1 migration** — read tolerance covers all v0.6 shapes; writes always emit `schema: 1` plus all v1 fields plus legacy mirrors so v0.6 ps-lando installs can still read the file.
+- **Typed event bus** — 4 v1.0 events (`plan-resolved`, `step-start`, `step-end`, `error`) for future telemetry.
+- **`--force-overwrite-theme`, `--allow-stock-overwrite`, `--allow-incompat-theme`, `--strict-compat`, `--config`, `--no-cache`, `--log-format`** flags wired on `create`.
+- **4 new hook env vars** — `PS_LANDO_THEME_NAME`, `PS_LANDO_PRESETS`, `PS_LANDO_MODULES_INSTALLED` (post-only), `PS_LANDO_RESOLVED_PLAN_JSON` (with `@<filepath>` fallback above 32KB).
+
+### Changed
+
+- **Test layout** — `tests/` → `tests/unit/`. Smoke project at `tests/smoke/` gated by `PSLANDO_SMOKE=1` (`pnpm test:smoke`).
+- **Theme deployment** — extracted theme-agnostic `findThemeRoot` and `deployTheme` into `src/lib/theme.ts`. Accepts both `config/theme.yml` and legacy PS 1.6 `config/theme.xml`. Ignores `__MACOSX/` and dotfiles.
+- **Detection shape** — `DetectedZips` generalized from the panda-specific `{ panda, easybuilder, transPanda, otherModules }` to the generic `{ themes, modules, unknown, warnings }` of `ZipClassification`.
+- **Module dep resolver** — INFRA + STBLOG_PARENT priorities moved out of `module-deps.ts` into the panda preset's `contributeDepEdges()`. The install graph now folds preset edges in. Panda flow byte-equivalent to v0.6.
+
+### Cinetic Panda parity
+
+- Default flow (`ps-lando create -y` with `panda*.zip` + `steasybuilder*` + `steasy_trans_panda*` zips in cwd, no CLI flags, no config) produces the SAME `themes/panda/` extraction, the SAME set of installed `st*` modules, and the SAME byte-for-byte `module_selection` block in `.ps-lando.json` as v0.6.0.
+
+## [0.6.0] — 2026-04-25
+
+### Added
+
+- **`ps-lando db reset`** — drops the sandbox DB and re-runs the CLI installer + module install + theme activation. ~3-5 min vs ~6 min for a full `create`. Reuses params and `module_selection` from `.ps-lando.json`.
+- **`ps-lando db dump [output]`** — gzipped MySQL dump. `--with-files` emits a `.tar.gz` bundle including `img/` + `themes/<active>/`. `modules/` intentionally excluded.
+- **`ps-lando db restore <path>`** — auto-detects format by extension (`.sql.gz` → DB only, `.tar.gz` → DB + files).
+- **`ps-lando doctor`** — diagnostic checklist. `--fix` prompts to apply auto-recoverable fixes interactively.
+- **`module_selection` persisted in `.ps-lando.json`** so `db reset` re-applies the same filtering.
+
+## [0.5.x] — 2026-04-24/25
+
+### 0.5.2
+
+- **`--no-copy-skipped` flag on `create`** — when paired with a selection flag, prevents the filtered modules from being copied to `modules/` at all.
+
+### 0.5.1
+
+- **Symfony cache race retry bumped from 1 to 3 attempts** with exponential backoff (500ms, 1500ms, 3000ms).
+
+### 0.5.0
+
+- **Module groups + `--skip-*` / `--only` flags** — four hard-coded groups (`blog`, `easybuilder`, `social`, `marketing`). _(Removed in 1.0.0 — see migration.)_
+- **Cache unified to `~/.cache/ps-lando/`** (XDG-compliant) with silent migration of pre-0.5 layouts.
+- **Interactive module multiselect in `create`** — `All modules` / `Core only` / `Custom...`.
+
+## [0.4.x] — 2026-04-24
+
+- **0.4.2**: Parallel module install (concurrency 3 default). `--sequential` escape hatch. Symfony cache race auto-retry.
+- **0.4.1**: HTMLPurifier cache dirs auto-created post CLI install (PS 8.2.x recovery).
+- **0.4.0**: Hooks + bundled recipes (`spain-taxes`, `demo-catalog-10`, `demo-customer-with-orders`, `demo-cms-pages`, `clean-seed`, `cache-warmup`).
+
+## Earlier releases
+
+For 0.3.x and earlier, see the [`CHANGELOG.md`](https://github.com/educlopez/ps-lando/blob/main/CHANGELOG.md) on GitHub.

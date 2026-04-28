@@ -1,4 +1,4 @@
 {
   "title": "Referencia",
-  "pages": ["commands", "flags", "recipes-catalog", "compatibility-matrix"]
+  "pages": ["commands", "flags", "config", "presets", "recipes-catalog", "compatibility-matrix"]
 }

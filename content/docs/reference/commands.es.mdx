@@ -9,19 +9,52 @@ Esta es la tabla canónica de comandos. Para profundizar en lo que hace cada uno
 
 | Comando | Qué hace |
 |---|---|
-| `create [name]` | Asistente interactivo con selector dinámico de versión de PS (desde 0.3.0). `-y` para defaults. `--ps-version 9.1.0` para fijar un tag. `--ps-zip <path>` para un install offline. `--hummingbird-build` para los assets de Hummingbird 2.0. Mira [Primer sandbox](/docs/guides/first-sandbox). |
-| `info [path]` | Resumen consolidado: URLs, credenciales del BO, tema activo, cuenta de módulos `st*`, versiones. |
+| `create [name]` | (1.0+) Zero-config: suelta cualquier zip de tema en cwd → `ps-lando create` auto-detecta + instala. Auto-carga el preset `panda` cuando hay un `panda*.zip`. `-y` para defaults. `--ps-version 9.1.0` para fijar un tag. `--theme=<name>` / `--preset=<name>` para selección explícita. Mira [Primer sandbox](/docs/guides/first-sandbox). |
+| `init` | (1.0+) Asistente interactivo. Recorre 7 prompts (clack) y escribe `pslando.config.json`, `init-scripts/01-example.sh` y una entrada en `.gitignore`. `--yes` para defaults, `--force` para sobrescribir. Mira [`init` abajo](#init). |
+| `info [path]` | Resumen consolidado: URLs, credenciales del BO, tema activo, cuenta de módulos, versiones. |
 | `open <target> [path]` | Abre URL en el navegador. Targets: `front` / `bo` (o `admin`) / `phpmyadmin` (o `pma`) / `mail` (o `mailhog`). |
-| `install-modules [path]` | Install batch de los módulos `st*` de Panda en disco. Alias: `im`. `--dry-run` para previsualizar el orden. `--include <prefix>` para acotar. Desde 0.4.2 instala los grupos seguros en paralelo; pasa `--sequential` para uno-a-uno legacy. Desde 0.5.0 soporta `--skip-*` / `--only`. Mira [Selección de módulos](/docs/guides/selecting-modules). |
-| `activate-theme <name> [path]` | Cambia el tema activo. Alias: `at`. Hace fallback a SQL si `prestashop:theme:enable` falla (bugs de PS 8.2.x / 9.x). `--force-sql` para saltarse el intento por consola. |
-| `list [path]` | Muestra los zips de SunnyToo detectados en un directorio. Alias: `ls`. |
+| `install-modules [path]` | Install batch de los módulos detectados en cwd. Alias: `im`. `--dry-run` para previsualizar el orden. `--exclude=<glob>` / `--only=<glob>` para filtrar. Concurrencia paralela 3 por defecto; pasa `--sequential` para uno-a-uno legacy. Mira [Selección de módulos](/docs/guides/selecting-modules). |
+| `activate-theme <name> [path]` | Cambia el tema activo. Alias: `at`. Fallback a SQL si `prestashop:theme:enable` falla (bugs de PS 8.2.x / 9.x). `--force-sql` para saltarse el intento por consola. |
+| `list [path]` | Muestra los zips detectados (temas + módulos) en un directorio. Alias: `ls`. |
 | `destroy [path]` | `lando destroy` — elimina contenedores + base de datos, mantiene los archivos en disco. |
-| `repair [path]` | `lando start` + cache clear sobre un proyecto existente. Úsalo después de un reinicio o si el BO está raro. |
-| `hooks <subcommand>` | Gestiona hooks + recipes incluidas. Subcomandos: `list`, `run <name>`, `run-all`, `install <name>`. Mira [Hooks y recipes](/docs/guides/hooks-and-recipes). |
-| `db reset [path]` | (0.6.0+) Tira la BD y re-ejecuta install + install de módulos + activación de tema. ~3-5 min. Reutiliza `module_selection` de `.ps-lando.json`. `-y` para saltarte confirm. Mira [Ciclo de vida del sandbox](/docs/guides/sandbox-lifecycle). |
-| `db dump [output] [path]` | (0.6.0+) Dump MySQL gzipped. `--with-files` cambia a un bundle `.tar.gz` que también incluye `img/` y `themes/<active>/`. |
-| `db restore <path> [project]` | (0.6.0+) Auto-detecta formato (`.sql.gz` → solo BD, `.tar.gz` → BD + files). `-y` para saltarte confirm. |
-| `doctor [path]` | (0.6.0+) Checklist diagnóstico con ✓/⚠/✗ por ítem. `--fix` pregunta para auto-recuperar lo que sea recuperable. Mira [Doctor](/docs/guides/doctor). |
+| `repair [path]` | `lando start` + cache clear sobre un proyecto existente. Úsalo tras un reinicio o si el BO está raro. |
+| `hooks <subcommand>` | Gestiona hooks + recipes. Subcomandos: `list`, `run <name>`, `run-all`, `install <name>`. Mira [Hooks y recipes](/docs/guides/hooks-and-recipes). |
+| `cache clear` | (1.0+) Borra el cache local del plan (`.pslando-cache.json`). Útil cuando la detección de zips parece atascada. `-y` para saltar confirm. |
+| `db reset [path]` | (0.6+) Tira la BD y re-ejecuta install + install de módulos + activación de tema. ~3-5 min. Reutiliza la selección persistida de `.ps-lando.json`. `-y` para saltarte confirm. Mira [Ciclo de vida del sandbox](/docs/guides/sandbox-lifecycle). |
+| `db dump [output] [path]` | (0.6+) Dump MySQL gzipped. `--with-files` cambia a un `.tar.gz` que también incluye `img/` y `themes/<active>/`. |
+| `db restore <path> [project]` | (0.6+) Auto-detecta formato (`.sql.gz` → solo BD, `.tar.gz` → BD + files). `-y` para saltarte confirm. |
+| `doctor [path]` | (0.6+) Checklist diagnóstico con ✓/⚠/✗ por ítem. `--fix` pregunta para auto-recuperar lo que sea reparable. Mira [Doctor](/docs/guides/doctor). |
+
+## `init`
+
+`ps-lando init` es el asistente interactivo de v1. Escribe un `pslando.config.json`, un script de hook de ejemplo y una entrada en `.gitignore`. Los 7 prompts (en orden):
+
+| Paso | Prompt | Default | Salta con |
+|---|---|---|---|
+| 1 | ¿Nombre del proyecto? | basename del cwd | `--yes` |
+| 2 | ¿Origen del tema? (auto-detect / zip específico / solo nombre / ninguno) | `auto-detect` | `--yes` |
+| 3 | Glob de módulos (picomatch sobre zips y carpetas) | `**` | `--yes` |
+| 4 | Directorio de init scripts | `./init-scripts` | el directorio ya existe |
+| 5 | Directorio de post scripts | `./post-scripts` | el directorio ya existe |
+| 6 | Auto-cargar preset (panda / none) | `panda` si se detecta `panda*.zip`, si no `none` | `--yes` |
+| 7 | Confirmar — ¿escribir config + script de ejemplo? | `true` | `--yes` |
+
+Ctrl-C en cualquier paso sale limpio con `"Init cancelled — no files written."` (sin estado parcial). Si `pslando.config.*` ya existe, `init` rechaza con exit 82 a menos que se pase `--force`.
+
+Mira [Referencia → Config](/docs/reference/config) para el esquema completo del archivo generado.
+
+## `cache clear`
+
+```bash
+ps-lando cache clear        # pide confirm
+ps-lando cache clear -y     # no interactivo
+```
+
+Borra `.pslando-cache.json` en el cwd. El cache guarda un hash de los zips detectados + plan resuelto para que el siguiente `create` se salte la re-detección — útil para ahorrar un par de segundos. Bórralo cuando:
+
+- Reemplazaste un zip por una versión distinta con el mismo nombre.
+- Añadiste / quitaste un `pslando.config.*` a mitad de sesión.
+- La CLI sigue usando un nombre de tema obsoleto tras renombrar un zip.
 
 ## Targets para `open`
 

@@ -1,4 +1,4 @@
 {
   "title": "Base de conocimiento",
-  "pages": ["schema-drift-ps-8-9", "symfony-cache-races", "htmlpurifier-cache-bug"]
+  "pages": ["migrating-from-0.x", "theme-compatibility", "schema-drift-ps-8-9", "symfony-cache-races", "htmlpurifier-cache-bug"]
 }

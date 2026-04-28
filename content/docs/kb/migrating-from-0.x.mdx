@@ -1,0 +1,175 @@
+---
+title: Migrating from 0.x to 1.0
+description: Step-by-step guide for upgrading existing ps-lando projects from 0.6.x to 1.0.0.
+---
+
+`ps-lando` 1.0.0 is a **breaking** release. The CLI is now zero-config (drop any theme zip → `ps-lando create` works) and the four `--skip-*` group flags from 0.5.x were removed. Existing 0.6.x projects keep working with these adjustments.
+
+Most teams finish this migration in under 10 minutes. The CI script update is the most likely place to need a tweak.
+
+<Callout type="info">
+**TL;DR:** the runtime UX is unchanged for the default case (`ps-lando create -y` in a folder with `panda.zip` still works the same way). What changed: removed `--skip-*` flags, optional `pslando.config.json`, new `init` and `cache clear` commands, expanded hook env vars, and explicit theme + module **prompts** when you don't pass `-y`.
+</Callout>
+
+## What's actually new in v1
+
+If you've been on 0.6.x and only run `ps-lando create -y`, **nothing about the default Panda flow changed for you** — same selections, same Panda + Easy Builder sandbox, same byte-equivalent extraction.
+
+What did change:
+
+1. **Theme-agnostic.** Drop a Falcon, Leo Classic, Hummingbird, custom — any zip with `config/theme.{yml,xml}` — and `ps-lando create` deploys it. The `--panda` flag is gone (and never existed as a public flag in 0.6 — it was hard-coded). See [Theme compatibility matrix](/docs/kb/theme-compatibility) for what we've validated.
+2. **Explicit prompts when you don't pass `-y`.** A `select` prompt for the theme (or `None`), and a `multiselect` for the modules (everything pre-checked). With `-y` everything auto-selects to match the v0.6 default.
+3. **Preset bound by selected theme name.** Pick a theme called `panda` in the prompt → bundled `panda` preset activates. Pick anything else → no preset binds (use `--preset=<name>` to force one).
+4. **Module multiselect, not group flags.** Group filters (`--skip-*`) were replaced by the multiselect prompt + `--exclude=<glob>` / `--only=<glob>` for CI.
+5. **Optional `pslando.config.json`.** `ps-lando init` generates one if you want repeatable, explicit behavior in CI / monorepos.
+
+None of these break a 0.6.x `-y` script. All of them are visible only when you go interactive (drop `-y`).
+
+## Step 1 — Update the CLI
+
+```bash
+npx ps-lando@1.0.0 --version
+# or, if you have a global install:
+npm i -g ps-lando@latest
+ps-lando --version
+```
+
+No registry change, no breaking package rename. The tarball is the same npm package.
+
+## Step 2 — Replace `--skip-*` flags in scripts and CI
+
+The four group flags were removed and now exit with code 64 (`UsageError`) plus a one-line migration hint to stderr.
+
+| Removed | v1 replacement |
+|---|---|
+| `--skip-easybuilder` | `--exclude=steasybuilder*` |
+| `--skip-blog` | `--exclude=stblog*` |
+| `--skip-social` | `--exclude=<glob>` patterns or panda-preset config |
+| `--skip-marketing` | `--exclude=<glob>` patterns or panda-preset config |
+| `--skip <list>` | `--exclude=<glob>` (per-name patterns also work) |
+
+Equivalent commands:
+
+```bash
+# Before (0.5.x / 0.6.x)
+ps-lando create -y --skip-blog --skip-easybuilder
+
+# After (1.0+)
+ps-lando create -y --exclude=stblog* --exclude=steasybuilder*
+```
+
+### Did your CI break? Find old flags in scripts
+
+Run these greps from your project root (or your CI repo root) to find every occurrence of the removed flags:
+
+```bash
+# Find all --skip-* invocations
+grep -rEn -- '--skip-(blog|easybuilder|social|marketing)\b' \
+  --include='*.sh' --include='*.yml' --include='*.yaml' \
+  --include='*.json' --include='*.md' --include='Makefile' .
+
+# Find legacy --skip <list> (note: trailing space, takes a value)
+grep -rEn -- '--skip [A-Za-z]' \
+  --include='*.sh' --include='*.yml' --include='*.yaml' .
+
+# GitHub Actions specifically
+grep -rEn -- '--skip-' .github/workflows/
+```
+
+If any of those return hits, replace per the table above. The CLI's stderr hint is identical to the migration table — copy-paste safe.
+
+## Step 3 — (Optional) generate a `pslando.config.json`
+
+`ps-lando init` is the new interactive scaffolder. It writes:
+
+- `pslando.config.json` with your chosen theme + preset.
+- `init-scripts/01-example.sh` (commented example, only if `init-scripts/` doesn't exist yet).
+- A `.gitignore` entry for `.pslando-cache.json`.
+
+```bash
+ps-lando init           # interactive (clack), 7 prompts
+ps-lando init --yes     # write defaults, no prompts
+ps-lando init --force   # overwrite an existing config
+```
+
+The init wizard is **optional** — zero-config still works. Use it if you want repeatable, explicit behavior in CI / monorepo setups.
+
+## Step 4 — `.ps-lando.json` schema migration (auto-lifted)
+
+The legacy `.ps-lando.json` (auto-written by `ps-lando create` since 0.6.0) is **lazily migrated** — `ps-lando` v1 reads both shapes, and the next write upgrades the file in place.
+
+### Field mapping
+
+| 0.6 (legacy) | 1.0 (new) |
+|---|---|
+| `panda: true` | `theme: "panda"`, `presets: ["panda"]` |
+| `panda: false` | `theme: "classic"`, `presets: []` |
+| `panda_version: "1.2.3"` | `themeVersion: "1.2.3"` |
+| `child_theme: "panda_child"` | `childTheme: "panda_child"` |
+| `module_selection.groups_skipped: ["easybuilder"]` | `excludePatterns: ["steasybuilder*"]` |
+| `module_selection.modules_skipped: [...]` | merged into `excludePatterns` |
+| `module_selection.only_modules: [...]` | merged into `modules.only` |
+| `module_selection.no_copy_skipped: true` | now a CLI flag only (`--no-copy-skipped`) |
+
+### Read tolerance
+
+- Missing `schema` → assumed `schema: 0` (treat as 0.6).
+- `panda: true` AND no `theme` → derive `theme = "panda"`, `themeVersion = panda_version`, `presets = ["panda"]`.
+- `panda: false` AND no `theme` → derive `theme = "classic"`, `presets = []`.
+- `child_theme` (snake) → mirrored to `childTheme` (camel).
+
+### Write behavior
+
+- Always write `schema: 1` plus all v1 fields.
+- ALSO write the legacy `panda`, `panda_version`, `child_theme` mirrors so a 0.6 ps-lando install can still read the file. Removable in v2.0.
+
+This means a 0.6.x → 1.0 migration is risk-free even on shared sandboxes — the file stays readable both ways until everyone upgrades.
+
+## Step 5 — New env vars in your hooks (optional)
+
+`init-scripts/*.sh` and `post-scripts/*.sh` now receive 4 new env vars on top of the existing set:
+
+| Variable | Phase | Use |
+|---|---|---|
+| `PS_LANDO_THEME_NAME` | init + post | Gate hooks to a specific theme. |
+| `PS_LANDO_PRESETS` | init + post | Gate hooks to a specific preset (comma-separated list). |
+| `PS_LANDO_MODULES_INSTALLED` | post-only | Log how many modules made it through. |
+| `PS_LANDO_RESOLVED_PLAN_JSON` | init + post | Full resolved plan as JSON. Falls back to `@/path/to/file.json` over 32 KB. |
+
+Existing hooks keep working — these are additive. See [Hooks & recipes](/docs/guides/hooks-and-recipes#new-in-100) for examples.
+
+## Step 6 — New commands worth knowing
+
+| Command | What it does |
+|---|---|
+| `ps-lando init` | Interactive scaffolder (clack, 7 prompts). Generates `pslando.config.json`. |
+| `ps-lando cache clear` | Wipes the local plan cache (`.pslando-cache.json`). Use when zip detection feels stuck. |
+
+The existing `create`, `info`, `open`, `install-modules`, `db reset`, `db dump`, `db restore`, `doctor`, `hooks`, `activate-theme`, `list`, `destroy`, `repair` commands keep their 0.6.x behavior.
+
+## What stays the same
+
+- `ps-lando create -y` in a folder with `panda*.zip` still installs the same Panda + Easy Builder sandbox.
+- All hook env vars from 0.4.0+ are still injected (additive change).
+- Recipes (`spain-taxes`, `demo-catalog-10`, etc.) work unchanged.
+- Lifecycle commands (`db reset`, `db dump`, `db restore`, `doctor`) are unchanged.
+- The `.ps-lando.json` file is still written on every `create` (now in v1 shape with legacy mirrors).
+
+## Quick rollback
+
+If something breaks and you need to un-stick a teammate fast:
+
+```bash
+npx ps-lando@0.6.0 <whatever>
+```
+
+The 0.6.0 tarball stays on npm forever and reads the v1-shaped `.ps-lando.json` thanks to the legacy mirrors written in Step 4. No data migration needed in either direction within the 0.6 ↔ 1.0 window.
+
+## Next steps
+
+<Cards>
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="The new multiselect + --exclude / --only flow." />
+  <Card title="Theme compatibility" href="/docs/kb/theme-compatibility" description="Validated themes and PS 9 caveats." />
+  <Card title="Config reference" href="/docs/reference/config" description="The full pslando.config.json schema." />
+  <Card title="Flags reference" href="/docs/reference/flags" description="All v1 flags + exit codes." />
+</Cards>

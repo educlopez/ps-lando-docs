@@ -18,16 +18,60 @@ Drop any executable `*.sh` file in there. Scripts run in lexicographic order —
 
 ## Env vars injected into hooks
 
-Every script receives this canonical bundle:
+Every script receives this canonical bundle (env var names stable since 0.4.0; the v1.0 set added 4 new entries below):
 
 ```bash
-PS_LANDO_PROJECT        # e.g. my-shop
-PS_LANDO_DOMAIN         # e.g. my-shop.lndo.site
-PS_LANDO_ADMIN_DIR      # e.g. admin233kcmq1wuumt38aojg (randomized)
-PS_LANDO_ADMIN_EMAIL    # e.g. admin@example.com
-PS_LANDO_PS_VERSION     # e.g. 9.1.0
-PS_LANDO_PROJECT_DIR    # absolute path to the project
-PS_LANDO_RECIPE_DIR     # only set for bundled recipes — path to recipes/<name>/
+PS_LANDO_PROJECT             # e.g. my-shop
+PS_LANDO_DOMAIN              # e.g. my-shop.lndo.site
+PS_LANDO_ADMIN_DIR           # e.g. admin233kcmq1wuumt38aojg (randomized)
+PS_LANDO_ADMIN_EMAIL         # e.g. admin@example.com
+PS_LANDO_PS_VERSION          # e.g. 9.1.0
+PS_LANDO_PROJECT_DIR         # absolute path to the project
+PS_LANDO_RECIPE_DIR          # only set for bundled recipes — path to recipes/<name>/
+```
+
+### New in 1.0.0
+
+```bash
+PS_LANDO_THEME_NAME          # e.g. panda — resolved theme name (or "none")
+PS_LANDO_PRESETS             # e.g. panda — comma-separated list of resolved presets ("" if none)
+PS_LANDO_MODULES_INSTALLED   # POST-only — count of modules actually installed (e.g. 6)
+PS_LANDO_RESOLVED_PLAN_JSON  # JSON blob of the full resolved plan; see fallback below
+```
+
+| Variable | Phase | Example |
+|---|---|---|
+| `PS_LANDO_THEME_NAME` | init + post | `panda`, `falcon`, `none` |
+| `PS_LANDO_PRESETS` | init + post | `panda` (single), `panda,custom` (multi), `` (none) |
+| `PS_LANDO_MODULES_INSTALLED` | **post only** | `6` (set after the install loop completes) |
+| `PS_LANDO_RESOLVED_PLAN_JSON` | init + post | A JSON blob describing the resolved theme, modules, hooks, etc. |
+
+### `PS_LANDO_RESOLVED_PLAN_JSON` 32KB fallback
+
+If the resolved plan JSON exceeds **32 KB** (large module sets, deeply nested preset metadata), `ps-lando` writes it to a temp file under the project's `.pslando-cache.json` neighborhood and exposes the path with a leading `@`:
+
+```bash
+# Inline (default — under 32 KB)
+PS_LANDO_RESOLVED_PLAN_JSON='{"theme":{"name":"panda",...}}'
+
+# File fallback (over 32 KB)
+PS_LANDO_RESOLVED_PLAN_JSON='@/abs/path/.pslando/resolved-plan-XXXX.json'
+```
+
+Hook scripts should detect both shapes:
+
+```bash
+#!/usr/bin/env bash
+set -eu
+
+if [[ "$PS_LANDO_RESOLVED_PLAN_JSON" == @* ]]; then
+  plan="$(cat "${PS_LANDO_RESOLVED_PLAN_JSON#@}")"
+else
+  plan="$PS_LANDO_RESOLVED_PLAN_JSON"
+fi
+
+theme=$(echo "$plan" | jq -r .theme.name)
+echo "Resolved theme: $theme"
 ```
 
 By default, if a script fails the CLI logs a warning and continues. Pass `--on-hook-failure fail` to abort at the first failure.
@@ -102,7 +146,7 @@ ps-lando create --on-hook-failure fail
 
 ## Writing your own recipe
 
-Any executable `*.sh` in `init-scripts/` or `post-scripts/` is automatically picked up. Example — seed a custom employee group:
+Any executable `*.sh` in `init-scripts/` or `post-scripts/` is automatically picked up. Example — seed a custom employee group, gated to the panda preset only:
 
 ```bash
 # init-scripts/10-custom-group.sh
@@ -110,12 +154,29 @@ Any executable `*.sh` in `init-scripts/` or `post-scripts/` is automatically pic
 set -eu
 cd "$PS_LANDO_PROJECT_DIR"
 
+# Skip if Panda preset isn't loaded — keeps the hook safe across themes.
+case ",$PS_LANDO_PRESETS," in
+  *,panda,*) ;;
+  *) echo "panda preset not active — skipping"; exit 0 ;;
+esac
+
+echo "Theme: $PS_LANDO_THEME_NAME"
+
 lando ssh -s appserver -c "mysql -hdatabase -ulamp -plamp lamp" <<SQL
 INSERT IGNORE INTO ps_group
   (reduction, price_display_method, show_prices, date_add, date_upd)
 VALUES
   (0, 0, 1, NOW(), NOW());
 SQL
+```
+
+Or in a `post-scripts/` hook, log how many modules ended up installed:
+
+```bash
+# post-scripts/99-summary.sh
+#!/usr/bin/env bash
+set -eu
+echo "Sandbox '$PS_LANDO_PROJECT' ready: theme=$PS_LANDO_THEME_NAME presets=$PS_LANDO_PRESETS modules=$PS_LANDO_MODULES_INSTALLED"
 ```
 
 Don't forget the executable bit:

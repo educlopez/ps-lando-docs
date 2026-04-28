@@ -1,16 +1,19 @@
 ---
 title: Welcome
-description: ps-lando spins up a full PrestaShop + Panda + Easy Builder sandbox in one command.
+description: ps-lando spins up a full PrestaShop sandbox — open to any theme — in one command.
 ---
 
-`ps-lando` is a CLI for local PrestaShop development. It wraps Lando (which wraps Docker) and adds the pieces a [Panda](https://addons.prestashop.com/) developer actually needs:
+`ps-lando` is a **zero-config** CLI for local PrestaShop development. Drop any theme zip into a folder, run one command, and you have a working sandbox. It wraps Lando (which wraps Docker) and adds the pieces every PrestaShop developer actually needs — open to any theme, with a bundled `panda` preset for [Panda](https://addons.prestashop.com/) shops:
 
+- **Open to any theme** — auto-detects the theme from `theme.yml` in any zip you drop in cwd. No theme-specific binary.
 - Downloads PrestaShop from the official CDN (PS 9.x) or GitHub Releases (PS 8.x).
-- Extracts the Panda theme zip and copies all `st*` modules.
+- Extracts the theme zip and copies all module zips alongside it.
 - Runs the PrestaShop CLI installer with sensible defaults.
-- Installs every Panda module in dependency-aware parallel batches.
-- Optionally runs hook scripts and bundled recipes.
-- Provides full sandbox lifecycle commands: `db reset`, `db dump`, `db restore`, `doctor`.
+- Installs every module in dependency-aware parallel batches.
+- Auto-loads the bundled **panda preset** when a `panda*.zip` is detected — backwards-compatible Panda + Easy Builder behavior.
+- Optionally runs hook scripts and bundled recipes (now with `PS_LANDO_THEME_NAME`, `PS_LANDO_PRESETS`, and a JSON resolved-plan in env).
+- Optional `pslando.config.json` (via `ps-lando init`) for explicit, repeatable behavior.
+- Full sandbox lifecycle commands: `db reset`, `db dump`, `db restore`, `doctor`.
 
 If you've ever spent an afternoon installing PrestaShop, dragging zips, configuring Lando, and re-installing modules one by one — `ps-lando` is for you.
 

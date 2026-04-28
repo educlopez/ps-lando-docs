@@ -1,0 +1,84 @@
+---
+title: Theme compatibility matrix
+description: Validated themes that ship a working sandbox out of the box, and the ones that need extra build steps.
+---
+
+`ps-lando` 1.0.0 is **theme-agnostic** — drop any zip with `config/theme.{yml,xml}` and the CLI will deploy it. But "the CLI deploys it" is not the same as "PrestaShop renders the front 200 OK". This page captures the themes we've smoke-tested end-to-end against PrestaShop 9.1 so you know what to expect before you spend time on a new theme.
+
+<Callout type="info">
+**Want to add a theme to the matrix?** Run `ps-lando create -y` with the theme zip in cwd, hit the home page, and report back via [GitHub issues](https://github.com/educlopez/ps-lando/issues). PRs welcome — the matrix lives in this very file.
+</Callout>
+
+## Validated themes (PrestaShop 9.1)
+
+| Theme | Version | Source | Front HTTP | Modules active | Notes |
+|---|---|---|---|---|---|
+| **Panda** | 2.9.2 | Cinetic (commercial) | ✅ 200 | 55 / 56 | Byte-equivalent to v0.6 hard-coded flow. Bundled `panda` preset auto-binds. |
+| **Leo Classic** | 2025 | Leo Themes (commercial) | ✅ 200 | 1 / 1 | Generic deploy. No preset. |
+| **Hummingbird** | bundled | PrestaShop core | ✅ 200 | n/a | `--hummingbird-build` flag handles the asset compile. |
+| **Falcon** | 3.1.2 | Leo Themes (2023, commercial) | ⚠ 500 | n/a | Theme targets PS 8.x. PS 9.1 incompatibility surfaced post-deploy — see caveat below. |
+
+`pslando create -y --no-install-modules` was used for the smoke baseline; the module count column reflects what `pslando install-modules` reports after a follow-up explicit run.
+
+### Caveat — themes that target PS 8.x
+
+The "compatibility manifest" inside a theme zip (`config/theme.yml` `compatibility.from`/`to`, or the legacy `<ps_versions_compliancy>` XML node) is **advisory, not authoritative**. Falcon 3.1.2 declares `compatibility.from: 8.0.0` but its templates rely on Smarty 3 / Symfony 4 internals that PrestaShop 9.1 dropped — the theme deploys cleanly, the front returns 500.
+
+If your project targets PS 9.x, prefer themes published or updated since 2024. For older themes, pin to PS 8.2 in `pslando.config.json`:
+
+```json
+{
+  "schema": 1,
+  "psVersion": "8.2.5",
+  "theme": "falcon"
+}
+```
+
+Or override per-run: `pslando create --ps-version=8.2.5 --theme=falcon`.
+
+## Themes with `_dev/` build sources
+
+Some themes ship a `_dev/` (or `dev/`) folder with Sass/JS/TS sources that must be compiled before the front renders. The deployed `themes/<name>/assets/` is empty until you run the theme's build.
+
+| Theme | Build command |
+|---|---|
+| **Hummingbird** | `pslando create --hummingbird-build` (handled automatically via an ephemeral `node:20` container) |
+| **Any other** | Manual, after `pslando create`: <br/> `cd themes/<name>/_dev && npm install && npm run build` |
+
+Hummingbird is the only theme with a baked-in shortcut. For Falcon, Panda v3+, and other custom themes shipping a `_dev/` tree, run the manual command from inside the sandbox after `pslando create` finishes:
+
+```bash
+cd themes/<theme-name>/_dev
+npm install     # or pnpm / yarn depending on the theme's lockfile
+npm run build   # produces themes/<name>/assets/
+```
+
+If the theme targets a Node version different from 20, run inside an ephemeral container:
+
+```bash
+docker run --rm -v "$PWD/themes/<theme-name>/_dev":/app -w /app node:18 \
+  bash -c "npm install && npm run build"
+```
+
+## What `pslando create` does NOT do
+
+- **Run the theme's build automatically** (except for Hummingbird via the explicit flag). Theme builds are theme-specific and we don't want surprise side-effects.
+- **Validate the theme's PS version compliance at runtime.** `pslando` checks `<ps_versions_compliancy>` against the chosen PS version and warns; with `--strict-compat` it blocks. But manifest mismatches with reality (Falcon-style) only surface on first front-page load.
+
+## Reporting a theme
+
+If you've tested a theme against `pslando` and want it added here, open an issue with:
+
+- Theme name + version + source (commercial / open-source / custom).
+- PS version tested.
+- Front HTTP status.
+- `pslando` version (`pslando --version`).
+- Any extra steps you needed (build commands, manual file edits, module exclusions).
+
+## Next steps
+
+<Cards>
+  <Card title="Migrating from 0.x" href="/docs/kb/migrating-from-0.x" description="Step-by-step upgrade guide." />
+  <Card title="Schema drift PS 8 → 9" href="/docs/kb/schema-drift-ps-8-9" description="What changes between PS major versions." />
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="The new multiselect + --exclude flow." />
+</Cards>
