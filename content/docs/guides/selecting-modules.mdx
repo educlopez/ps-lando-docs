@@ -3,11 +3,35 @@ title: Selecting modules
 description: Use --exclude / --only globs (or pslando.config.json) to filter which modules get installed.
 ---
 
-Since **1.0.0**, `create` and `install-modules` filter modules through a single, generic mechanism: the **`--exclude=<glob>`** flag (repeatable, picomatch-backed, case-insensitive). The pre-1.0 group flags (`--skip-easybuilder`, `--skip-blog`, `--skip-social`, `--skip-marketing`) were removed — running them now exits 64 with a one-line migration hint to stderr.
+Since **1.0.0** (`1.0.0-rc.2`), `ps-lando` picks modules in two layers:
+
+1. **Interactive multiselect prompt** during `create` — every module zip detected in the cwd is pre-checked. Untick what you don't want, hit enter, those zips never enter the install graph.
+2. **Glob filters** — `--exclude=<glob>` and `--only=<glob>` (repeatable, picomatch-backed, case-insensitive) for CI / scripts / configs. Both also live in `pslando.config.json`.
+
+The pre-1.0 group flags (`--skip-easybuilder`, `--skip-blog`, `--skip-social`, `--skip-marketing`) were removed — running them now exits 64 with a one-line migration hint to stderr.
 
 <Callout type="warn">
 **Breaking change in 1.0.0.** All four `--skip-*` group flags are gone. See the [Migrating from 0.x](/docs/kb/migrating-from-0.x) guide for a step-by-step replacement table.
 </Callout>
+
+## The interactive multiselect
+
+Run `ps-lando create` (without `-y`) in a folder with one or more module zips:
+
+```text
+?  Pick modules to install · multiple selection
+●  steasybuilder
+●  steasy_trans_panda
+●  stmegamenu
+●  stbanner
+○  stblog        ← unticked manually
+●  stsocial
+```
+
+- Defaults to **all detected modules pre-checked** (back-compat with v0.6 "install everything").
+- Selection writes through to `excludePatterns` in `.ps-lando.json` so `db reset` reapplies the same set.
+- With `-y`: the prompt is skipped and every detected module is installed (same as a fully-checked multiselect).
+- The CLI **only** considers zips dropped in the cwd (or `--zips=<dir>`). PS-bundled modules sitting inside the PS download are never re-installed by `pslando create` — that fixed the 1.0.0-rc.1 bug where stock modules sneaked into the count.
 
 ## Why generic `--exclude`
 
@@ -129,9 +153,29 @@ ps-lando install-modules --only=stmegamenu --only=stbanner
 ps-lando create -y --exclude=stblog* --no-copy-skipped
 ```
 
-## Interactive mode
+## Modules from a non-Panda theme
 
-When you run `ps-lando create` without `-y` and without `--exclude` / `--only` flags, the resolver still applies any config in `pslando.config.json`. There's no module multiselect prompt anymore — the preset + config combination drives the behavior. Use `ps-lando init` for the guided flow.
+The same flow works for any theme — Panda, Falcon, Leo Classic, your own. Drop the theme zip plus its module zips alongside it:
+
+```text
+my-shop/
+├── leo_classic.zip          ← theme, classified by config/theme.yml
+├── stmegamenu.zip           ← module, classified by stmegamenu/stmegamenu.php
+├── stbanner.zip
+└── stsocial.zip
+```
+
+Run `ps-lando create`. The theme `select` prompt lists `leo_classic` (and `None`); the module multiselect lists `stmegamenu`, `stbanner`, `stsocial` all pre-checked. No preset binding fires (the `panda` preset only matches the literal name `panda`), so you get a generic deploy: theme extracted to `themes/leo_classic/`, modules installed in dependency order, no Easy Builder bridge.
+
+Want the same selection persisted for `db reset`? Run `ps-lando init` afterwards and accept the auto-detected values — it writes the config + zip set to `pslando.config.json`.
+
+## How `-y` interacts with `--exclude` / `--only`
+
+- `ps-lando create -y` (no flags) → all detected modules selected, `--exclude` / `--only` empty, install everything.
+- `ps-lando create -y --exclude=stblog*` → all detected modules selected by the implicit multiselect, then `stblog*` is filtered before install.
+- `ps-lando create -y --only=stbanner` → only `stbanner` installed, even if other module zips are present.
+
+CLI flags always win — they apply on top of whichever set the multiselect (or its `-y` shortcut) produced.
 
 ## Persistence in `.ps-lando.json`
 

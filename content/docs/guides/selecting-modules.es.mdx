@@ -3,11 +3,35 @@ title: Selección de módulos
 description: Usa --exclude / --only (globs) o pslando.config.json para filtrar qué módulos se instalan.
 ---
 
-Desde **1.0.0**, `create` e `install-modules` filtran módulos a través de un único mecanismo genérico: la flag **`--exclude=<glob>`** (repetible, basada en picomatch, case-insensitive). Las flags de grupo pre-1.0 (`--skip-easybuilder`, `--skip-blog`, `--skip-social`, `--skip-marketing`) fueron eliminadas — usarlas ahora termina con exit 64 y un hint de migración en stderr.
+Desde **1.0.0** (`1.0.0-rc.2`), `ps-lando` elige los módulos en dos capas:
+
+1. **Multiselect interactivo** durante `create` — cada zip de módulo detectado en el cwd está pre-marcado. Desmarca lo que no quieras, dale a enter y esos zips no entran al grafo de install.
+2. **Filtros de glob** — `--exclude=<glob>` y `--only=<glob>` (repetibles, picomatch, case-insensitive) para CI / scripts / configs. Ambos también viven en `pslando.config.json`.
+
+Las flags de grupo pre-1.0 (`--skip-easybuilder`, `--skip-blog`, `--skip-social`, `--skip-marketing`) fueron eliminadas — usarlas ahora termina con exit 64 y un hint de migración en stderr.
 
 <Callout type="warn">
 **Breaking change en 1.0.0.** Las cuatro flags `--skip-*` ya no existen. Mira la guía [Migración desde 0.x](/docs/kb/migrating-from-0.x) para una tabla de reemplazo paso a paso.
 </Callout>
+
+## El multiselect interactivo
+
+Ejecuta `ps-lando create` (sin `-y`) en una carpeta con uno o más zips de módulos:
+
+```text
+?  Pick modules to install · multiple selection
+●  steasybuilder
+●  steasy_trans_panda
+●  stmegamenu
+●  stbanner
+○  stblog        ← desmarcado a mano
+●  stsocial
+```
+
+- Por defecto, **todos los módulos detectados van pre-marcados** (back-compat con el "install everything" de v0.6).
+- La selección se escribe en `excludePatterns` de `.ps-lando.json` para que `db reset` reaplique el mismo set.
+- Con `-y`: el prompt se salta y se instalan todos los módulos detectados (equivale a un multiselect totalmente marcado).
+- La CLI **solo** considera los zips soltados en el cwd (o `--zips=<dir>`). Los módulos pre-instalados de PS dentro del download de PS nunca se reinstalan por `pslando create` — eso arregló el bug de 1.0.0-rc.1 donde se colaban módulos stock.
 
 ## Por qué `--exclude` genérico
 
@@ -129,9 +153,29 @@ ps-lando install-modules --only=stmegamenu --only=stbanner
 ps-lando create -y --exclude=stblog* --no-copy-skipped
 ```
 
-## Modo interactivo
+## Módulos desde un tema no-Panda
 
-Cuando ejecutas `ps-lando create` sin `-y` y sin flags `--exclude` / `--only`, el resolver aplica igualmente lo que esté en `pslando.config.json`. Ya no hay un multiselect de módulos — la combinación preset + config dirige el comportamiento. Usa `ps-lando init` para el flujo guiado.
+El mismo flujo vale para cualquier tema — Panda, Falcon, Leo Classic, el tuyo propio. Suelta el zip del tema más sus zips de módulos al lado:
+
+```text
+my-shop/
+├── leo_classic.zip          ← tema, clasificado por config/theme.yml
+├── stmegamenu.zip           ← módulo, clasificado por stmegamenu/stmegamenu.php
+├── stbanner.zip
+└── stsocial.zip
+```
+
+Ejecuta `ps-lando create`. El prompt `select` de tema lista `leo_classic` (y `None`); el multiselect de módulos lista `stmegamenu`, `stbanner`, `stsocial` todos pre-marcados. No se dispara ningún preset (el preset `panda` solo matchea con el nombre literal `panda`), así que tienes un deploy genérico: tema extraído a `themes/leo_classic/`, módulos instalados en orden de dependencia, sin puente Easy Builder.
+
+¿Quieres persistir la misma selección para `db reset`? Ejecuta `ps-lando init` después y acepta los valores auto-detectados — escribe el config + el set de zips a `pslando.config.json`.
+
+## Cómo interactúa `-y` con `--exclude` / `--only`
+
+- `ps-lando create -y` (sin flags) → todos los módulos detectados seleccionados, `--exclude` / `--only` vacíos, instala todo.
+- `ps-lando create -y --exclude=stblog*` → todos los módulos detectados quedan seleccionados por el multiselect implícito, luego `stblog*` se filtra antes del install.
+- `ps-lando create -y --only=stbanner` → solo `stbanner` se instala, aunque haya otros zips presentes.
+
+Las flags CLI siempre ganan — se aplican encima del set que produjo el multiselect (o su atajo `-y`).
 
 ## Persistencia en `.ps-lando.json`
 
