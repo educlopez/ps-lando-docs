@@ -1,91 +1,147 @@
 ---
 title: Flags
-description: Full reference of create + install-modules flags, grouped by purpose.
+description: Full reference of every ps-lando flag in v1.0, plus exit codes and the v0.x → v1 removal table.
 ---
 
-Every flag accepted by `ps-lando create` and `ps-lando install-modules`, grouped by what it controls.
+Every flag accepted by `ps-lando` v1.0, grouped by command. Removed flags from 0.x are listed at the bottom with their replacements. Exit codes are documented in the [Exit codes](#exit-codes) table — the CLI uses contiguous range `64–82` for v1-spec'd error categories (mirrors Info-Zip's 82 + sysexits.h base 64).
 
 ## `create` flags
 
 ### Basic
 
-| Flag | Purpose |
-|---|---|
-| `-y, --yes` | Non-interactive, accept defaults. CI-friendly. |
-| `--ps-version <v>` | PrestaShop tag (e.g. `8.2.5`, `9.1.0`, `9.0.3`). Skips the interactive picker. Legacy `--ps` alias still works. |
-| `--ps-zip <path>` | Use a pre-downloaded PS zip. Bypasses the network entirely. |
-| `-z, --zips <dir>` | Directory with SunnyToo zips (default: project dir). |
-| `--hummingbird-build` | After install, build Hummingbird 2.0 assets via an ephemeral `node:20` Docker container. |
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `-y, --yes` | bool | `false` | 0.1 | Non-interactive, accept defaults. CI-friendly. |
+| `--ps-version=<v>` | string | _(picker)_ | 0.3 | PrestaShop tag (e.g. `8.2.5`, `9.1.0`). Skips the interactive picker. Legacy `--ps` alias still works. |
+| `--ps-zip=<path>` | string | _(download)_ | 0.3 | Use a pre-downloaded PS zip. Bypasses network entirely. |
+| `-z, --zips=<dir>` | string | cwd | 0.1 | Directory with theme + module zips. |
+| `--hummingbird-build` | bool | `false` | 0.4 | After install, build Hummingbird 2.0 assets via `node:20` Docker container. |
+
+### Theme & preset selection (v1.0+)
+
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `--theme=<name\|path>` | string | _(auto-detect)_ | **1.0** | Theme name (matches a `theme.yml` `<name>` in cwd zips) or `.zip` path. `--theme=none` for explicit no-theme. |
+| `--preset=<name>` | string (repeatable) | _(auto-detect)_ | **1.0** | Built-in (`panda`, `none`) or relative path (`./presets/foo.ts`). Repeat to layer. |
+| `--no-preset` | bool | `false` | **1.0** | Disable all presets including auto-detected. |
+| `--force-overwrite-theme` | bool | `false` | **1.0** | Allow overwriting an existing `themes/<name>/` directory. |
+| `--allow-incompat-theme` | bool | `false` | **1.0** | Skip the `<ps_versions_compliancy>` compatibility check. |
+| `--strict-compat` | bool | `false` | **1.0** | Promote a compat warning to a fatal error (exit 76). |
 
 ### Module selection
 
-| Flag | Purpose |
-|---|---|
-| `--no-install-modules` | Skip the batch `st*` module install at the end of `create`. Modules are still copied; run `ps-lando install-modules` later. |
-| `--sequential` | Install Panda modules one at a time (default since 0.4.2 is parallel concurrency 3). Slower, easier to debug. |
-| `--skip-blog` | (0.5.0+) Skip the 11 blog modules. |
-| `--skip-easybuilder` | (0.5.0+) Skip Easy Builder + bridge. Also blocks the copy step. |
-| `--skip-social` | (0.5.0+) Skip the 4 social modules. |
-| `--skip-marketing` | (0.5.0+) Skip the 4 marketing modules. |
-| `--skip <list>` | (0.5.0+) Comma-separated module names to skip individually. Unknown names warn and continue. |
-| `--only <list>` | (0.5.0+) Install ONLY the listed modules. Mutually exclusive with `--skip-*`. Unknown names error out. |
-| `--no-copy-skipped` | (0.5.2+) When paired with `--skip-*` / `--only`, also exclude filtered modules from the copy step. No-op without a selection flag. |
-
-See [Selecting modules](/docs/guides/selecting-modules) for the conceptual overview and combos.
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `--exclude=<glob>` | string (repeatable) | `[]` | **1.0** | picomatch glob, case-insensitive. Composes with `--only`. Empty value exits 64. |
+| `--only=<glob>` | string (repeatable) | `[]` | 0.5 | Install ONLY modules matching the glob(s). Composes with `--exclude` (intersection). |
+| `--no-install-modules` | bool | `false` | 0.1 | Skip the batch install at the end of `create`. Modules are still copied. |
+| `--no-copy-skipped` | bool | `false` | 0.5.2 | When paired with `--exclude` / `--only`, also exclude filtered modules from the copy step. |
+| `--allow-stock-overwrite` | bool | `false` | **1.0** | Allow overwriting stock PS modules. |
+| `--sequential` | bool | `false` | 0.4.2 | Install modules one at a time (default is parallel concurrency 3). |
 
 ### Hooks & recipes
 
-| Flag | Purpose |
-|---|---|
-| `--recipes <names>` | (0.4.0+) Comma-separated list of bundled recipes to run. Used in `-y` mode; interactive mode shows a multiselect. |
-| `--on-hook-failure fail\|continue` | (0.4.0+) Whether a failing hook aborts the rest of the pipeline (`fail`) or logs and keeps going (`continue`, default). |
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `--recipes=<names>` | string | `""` | 0.4 | Comma-separated bundled recipes to run. Used in `-y` mode. |
+| `--on-hook-failure=<fail\|continue>` | enum | `continue` | 0.4 | Whether a failing hook aborts the rest of the pipeline. |
 
-See [Hooks & recipes](/docs/guides/hooks-and-recipes).
+### Config & cache
+
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `--config=<path>` | string | _(cosmiconfig)_ | **1.0** | Bypass cosmiconfig discovery; load this file directly. |
+| `--no-cache` | bool | `false` | **1.0** | Skip `.pslando-cache.json` read/write for this run. |
+| `--log-format=<text\|json>` | enum | `text` | **1.0** | Mirror of `PSLANDO_LOG_FORMAT` env. JSON puts decisions on stderr as one event per line. |
+| `--quiet` | bool | `false` | 0.4 | Suppress info / decision logs on stderr. |
+| `--verbose` | bool | `false` | 0.4 | Annotate every resolved-decision line with its `source:`. |
+| `--help`, `--version` | bool | — | 0.1 | Standard. |
 
 ## `install-modules` flags
 
-| Flag | Purpose |
+`install-modules` (alias `im`) reuses the `--exclude`, `--only`, `--no-copy-skipped`, `--sequential`, `--allow-stock-overwrite`, `--config`, `--log-format`, `--quiet`, `--verbose` flags from `create` plus:
+
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `--dry-run` | bool | `false` | 0.4 | Preview install order without invoking PrestaShop. |
+| `--include=<prefix>` | string | — | 0.1 | Only install modules whose name starts with `<prefix>` (legacy; consider `--only=<prefix>*`). |
+
+## `init` flags (1.0+)
+
+`ps-lando init` is the interactive scaffolder. Walks through 7 prompts (clack) and writes `pslando.config.json`, `init-scripts/01-example.sh`, and a `.gitignore` entry. See [Reference → Config](/docs/reference/config) and [Reference → Commands](/docs/reference/commands#init).
+
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `--yes` | bool | `false` | **1.0** | Skip all prompts, write defaults. |
+| `--force` | bool | `false` | **1.0** | Overwrite existing `pslando.config.*`. Without `--force`, refuses with exit 82. |
+
+## `cache clear` flags (1.0+)
+
+`ps-lando cache clear` wipes the local plan cache (`.pslando-cache.json`).
+
+| Flag | Type | Default | Since | Description |
+|---|---|---|---|---|
+| `-y, --yes` | bool | `false` | **1.0** | Skip the confirm prompt. |
+
+## `db reset` / `db dump` / `db restore` / `doctor` / `activate-theme`
+
+These flags are unchanged in v1.0:
+
+- `db reset`: `-y, --yes`
+- `db dump`: `--with-files` (bundle SQL + `img/` + `themes/<active>/` into a `.tar.gz`)
+- `db restore`: `-y, --yes`
+- `doctor`: `--fix`
+- `activate-theme`: `--force-sql`
+
+## Removed flags (BREAKING — v1.0.0)
+
+The four `--skip-*` group flags from 0.5.x were removed. Running them now exits 64 (`UsageError`) with a one-line migration hint to stderr. Replacements:
+
+| Removed | Replacement |
 |---|---|
-| `--dry-run` | Preview install order without invoking PrestaShop. |
-| `--include <prefix>` | Only install modules whose name starts with `<prefix>` (e.g. `stblog`). |
-| `--sequential` | Force one-at-a-time install (default is parallel concurrency 3 since 0.4.2). |
-| `--skip-blog` / `--skip-easybuilder` / `--skip-social` / `--skip-marketing` | (0.5.0+) Same group flags as `create`. |
-| `--skip <list>` | (0.5.0+) Comma-separated names to skip. |
-| `--only <list>` | (0.5.0+) Install ONLY the listed modules. |
+| ~~`--skip-easybuilder`~~ | `--exclude=steasybuilder*` (or `modules.exclude` in `pslando.config.json`) |
+| ~~`--skip-blog`~~ | `--exclude=stblog*` (or via the panda preset's group config) |
+| ~~`--skip-social`~~ | `--exclude=<glob>` patterns or preset config |
+| ~~`--skip-marketing`~~ | `--exclude=<glob>` patterns or preset config |
+| ~~`--skip <list>`~~ | `--exclude=<glob>` (per-name patterns also work) |
 
-## `db reset` flags
-
-| Flag | Purpose |
-|---|---|
-| `-y, --yes` | Skip the confirm prompt. |
-
-## `db dump` flags
-
-| Flag | Purpose |
-|---|---|
-| `--with-files` | Bundle SQL + `img/` + `themes/<active>/` into a `.tar.gz` instead of a `.sql.gz`. |
-
-## `db restore` flags
-
-| Flag | Purpose |
-|---|---|
-| `-y, --yes` | Skip the confirm prompt. |
-
-## `doctor` flags
-
-| Flag | Purpose |
-|---|---|
-| `--fix` | For each failing item that's auto-recoverable, prompt to apply the fix interactively. |
-
-## `activate-theme` flags
-
-| Flag | Purpose |
-|---|---|
-| `--force-sql` | Skip the `prestashop:theme:enable` console attempt and go directly to the SQL fallback. |
+See the [Migrating from 0.x](/docs/kb/migrating-from-0.x) guide for grep recipes to find old flags in CI scripts.
 
 ## Mutual exclusions
 
-- `--only` is mutually exclusive with every `--skip-*` form. Combining them exits with code 2.
+- `--no-preset` cannot be combined with `--preset=<name>` (exit 64).
+- `--exclude=` (empty value) exits 64 — supply at least one non-empty pattern.
+
+## Exit codes
+
+`ps-lando` v1.0 uses these exit codes (contiguous range 64–82 for spec'd categories):
+
+| Code | Name | Trigger |
+|---|---|---|
+| 0 | OK | Success. |
+| 1 | GenericError | Catch-all (unknown error / JS exception). |
+| 2 | AmbiguousTheme | 2+ themes detected, non-TTY, no `--theme=`. |
+| 64 | UsageError | Unknown / removed flag, bad flag value, empty `--exclude=`. |
+| 65 | SchemaValidationError | `pslando.config.*` fails the zod schema. |
+| 66 | ConfigNotFound | `--config=<path>` passed but file missing. |
+| 67 | PresetNotFound | `--preset=<name>` resolves to nothing. |
+| 68 | CorruptZip | `unzip -l` fails on a detected zip. |
+| 69 | EncryptedZip | Zip is encrypted (Info-Zip exit 82). |
+| 70 | UnknownZipShape | Zip has neither `theme.yml`/`.xml` nor `<name>/<name>.php` at root. |
+| 71 | DependencyResolutionError | Module / preset dependency cycle or missing dep. |
+| 72 | HookExecutionError | Hook script exited non-zero AND `--on-hook-failure=fail`. |
+| 73 | CacheCorruption | `.pslando-cache.json` is malformed or unreadable. |
+| 74 | NetworkError | PS download / npm registry check failed after retries. |
+| 75 | LandoStartFailed | `lando start` returned non-zero. |
+| 76 | ThemeIncompatible | `<ps_versions_compliancy>` mismatch AND `--strict-compat`. |
+| 77 | ThemeOverwriteRefused | `themes/<name>/` exists AND no `--force-overwrite-theme`. |
+| 78 | StockModuleOverwrite | A module zip would clobber a PS stock module AND no `--allow-stock-overwrite`. |
+| 79 | DiskFull | Write failed with `ENOSPC`. |
+| 80 | PermissionDenied | Filesystem permission failure (EACCES / EPERM). |
+| 81 | InitCancelled | User pressed Ctrl-C during `ps-lando init`. (Treated as code 0 in some envs — see spec §1.5.) |
+| 82 | InitConfigExists | `pslando.config.*` already exists AND no `--force`. |
+
+For complete trigger definitions and suggested user actions, see the spec exit-code table.
 
 ## Defaults in `-y` mode
 
@@ -95,12 +151,12 @@ When `-y` is passed without other flags:
 |---|---|
 | Project name | basename of cwd |
 | PS version | newest stable from the manifest (currently 9.1.0) |
+| Theme | auto-detect from cwd `*.zip` (or `none` if no theme zip) |
+| Preset | `panda` if `panda*.zip` detected, else `none` |
 | PHP | 8.2 (PS 9) or 8.1 (PS 8) |
 | Database | MySQL |
 | Extras | phpMyAdmin + MailHog |
-| Panda | yes if `panda*.zip` detected |
 | Child theme | yes, named `<project>_child` |
-| Easy Builder | yes if `steasybuilder.zip` + `steasy_trans_panda.zip` both present |
 | Admin email | `admin@example.com` |
 | Admin password | `sandbox1234` |
 | Locale | `es / es / Europe/Madrid` |
@@ -109,5 +165,6 @@ When `-y` is passed without other flags:
 
 <Cards>
   <Card title="Commands reference" href="/docs/reference/commands" description="Top-level command table." />
-  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="When to use each --skip-*." />
+  <Card title="Config reference" href="/docs/reference/config" description="The full pslando.config.json schema." />
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="When to use --exclude vs --only." />
 </Cards>
