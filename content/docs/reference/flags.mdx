@@ -21,9 +21,9 @@ Every flag accepted by `ps-lando` v1.0, grouped by command. Removed flags from 0
 
 | Flag | Type | Default | Since | Description |
 |---|---|---|---|---|
-| `--theme=<name\|path>` | string | _(auto-detect)_ | **1.0** | Theme name (matches a `theme.yml` `<name>` in cwd zips) or `.zip` path. `--theme=none` for explicit no-theme. |
-| `--preset=<name>` | string (repeatable) | _(auto-detect)_ | **1.0** | Built-in (`panda`, `none`) or relative path (`./presets/foo.ts`). Repeat to layer. |
-| `--no-preset` | bool | `false` | **1.0** | Disable all presets including auto-detected. |
+| `--theme=<name\|path\|none>` | string | _(prompt)_ | **1.0** | Theme name (matches a `theme.yml` / `theme.xml` `<name>` in cwd zips) or `.zip` path. `--theme=none` opts out of theme deployment entirely. Skips the interactive `select` prompt. |
+| `--preset=<name>` | string (repeatable) | _(theme-name binding)_ | **1.0** | Built-in (`panda`, `none`) or relative path (`./presets/foo.ts`). Repeat to layer. By default a preset whose name matches the **selected theme name** activates (e.g. picking `panda` activates the bundled `panda` preset). |
+| `--no-preset` | bool | `false` | **1.0** | Disable all presets — overrides the theme-name binding above. |
 | `--force-overwrite-theme` | bool | `false` | **1.0** | Allow overwriting an existing `themes/<name>/` directory. |
 | `--allow-incompat-theme` | bool | `false` | **1.0** | Skip the `<ps_versions_compliancy>` compatibility check. |
 | `--strict-compat` | bool | `false` | **1.0** | Promote a compat warning to a fatal error (exit 76). |
@@ -151,8 +151,9 @@ When `-y` is passed without other flags:
 |---|---|
 | Project name | basename of cwd |
 | PS version | newest stable from the manifest (currently 9.1.0) |
-| Theme | auto-detect from cwd `*.zip` (or `none` if no theme zip) |
-| Preset | `panda` if `panda*.zip` detected, else `none` |
+| Theme | 1 detected → auto-selected. 2+ detected → exit 2 (`AmbiguousThemeError`) — pass `--theme=<name>`. 0 detected → vanilla install (bundled `classic` / `hummingbird`). |
+| Preset | activates if its name matches the selected theme name (e.g. `panda` → bundled `panda` preset). `--no-preset` opts out. |
+| Modules | every module zip detected in cwd is auto-checked (= installed). Filter with `--exclude=<glob>` / `--only=<glob>`. |
 | PHP | 8.2 (PS 9) or 8.1 (PS 8) |
 | Database | MySQL |
 | Extras | phpMyAdmin + MailHog |

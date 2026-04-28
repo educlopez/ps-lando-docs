@@ -21,9 +21,9 @@ Cada flag aceptada por `ps-lando` v1.0, agrupada por comando. Las flags eliminad
 
 | Flag | Tipo | Default | Desde | Descripción |
 |---|---|---|---|---|
-| `--theme=<name\|path>` | string | _(auto-detect)_ | **1.0** | Nombre de tema (matchea un `<name>` de `theme.yml` en zips del cwd) o ruta `.zip`. `--theme=none` para sin-tema explícito. |
-| `--preset=<name>` | string (repetible) | _(auto-detect)_ | **1.0** | Built-in (`panda`, `none`) o ruta relativa (`./presets/foo.ts`). Repite para apilar. |
-| `--no-preset` | bool | `false` | **1.0** | Desactiva todos los presets, incluso los auto-detectados. |
+| `--theme=<name\|path\|none>` | string | _(prompt)_ | **1.0** | Nombre de tema (matchea un `<name>` de `theme.yml` / `theme.xml` en zips del cwd) o ruta `.zip`. `--theme=none` descarta el deployment del tema entero. Salta el prompt `select` interactivo. |
+| `--preset=<name>` | string (repetible) | _(binding por nombre de tema)_ | **1.0** | Built-in (`panda`, `none`) o ruta relativa (`./presets/foo.ts`). Repite para apilar. Por defecto, un preset cuyo nombre coincida con el **nombre del tema seleccionado** se activa (p. ej. elegir `panda` activa el preset `panda` incluido). |
+| `--no-preset` | bool | `false` | **1.0** | Desactiva todos los presets — anula el binding por nombre de tema de arriba. |
 | `--force-overwrite-theme` | bool | `false` | **1.0** | Permite sobrescribir un `themes/<name>/` existente. |
 | `--allow-incompat-theme` | bool | `false` | **1.0** | Salta la verificación de `<ps_versions_compliancy>`. |
 | `--strict-compat` | bool | `false` | **1.0** | Promueve un warning de compat a error fatal (exit 76). |
@@ -151,8 +151,9 @@ Cuando se pasa `-y` sin otras flags:
 |---|---|
 | Nombre del proyecto | basename del cwd |
 | Versión PS | la estable más reciente del manifest (actualmente 9.1.0) |
-| Tema | auto-detect de los `*.zip` del cwd (o `none` si no hay zip de tema) |
-| Preset | `panda` si se detecta `panda*.zip`, si no `none` |
+| Tema | 1 detectado → auto-seleccionado. 2+ detectados → exit 2 (`AmbiguousThemeError`) — pasa `--theme=<name>`. 0 detectados → install vanilla (`classic` / `hummingbird` incluidos). |
+| Preset | se activa si su nombre coincide con el nombre del tema seleccionado (p. ej. `panda` → preset `panda` incluido). `--no-preset` lo desactiva. |
+| Módulos | cada zip de módulo detectado en cwd queda auto-marcado (= instalado). Filtra con `--exclude=<glob>` / `--only=<glob>`. |
 | PHP | 8.2 (PS 9) o 8.1 (PS 8) |
 | Base de datos | MySQL |
 | Extras | phpMyAdmin + MailHog |
