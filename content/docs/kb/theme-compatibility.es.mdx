@@ -1,0 +1,84 @@
+---
+title: Matriz de compatibilidad de temas
+description: Temas validados que dejan un sandbox funcionando out of the box, y los que requieren pasos de build extra.
+---
+
+`ps-lando` 1.0.0-rc.2 es **theme-agnostic** — suelta cualquier zip con `config/theme.{yml,xml}` y la CLI lo despliega. Pero "la CLI lo despliega" no es lo mismo que "PrestaShop renderiza el front 200 OK". Esta página captura los temas que hemos smoke-tested end-to-end contra PrestaShop 9.1 para que sepas qué esperar antes de invertir tiempo en uno nuevo.
+
+<Callout type="info">
+**¿Quieres añadir un tema a la matriz?** Ejecuta `ps-lando create -y` con el zip del tema en cwd, accede a la home y reporta vía [GitHub issues](https://github.com/educlopez/ps-lando/issues). PRs bienvenidas — la matriz vive en este mismo archivo.
+</Callout>
+
+## Temas validados (PrestaShop 9.1)
+
+| Tema | Versión | Origen | Front HTTP | Módulos activos | Notas |
+|---|---|---|---|---|---|
+| **Panda** | 2.9.2 | Cinetic (comercial) | ✅ 200 | 55 / 56 | Byte-equivalente al flujo hard-coded de v0.6. El preset `panda` incluido se vincula automáticamente. |
+| **Leo Classic** | 2025 | Leo Themes (comercial) | ✅ 200 | 1 / 1 | Deploy genérico. Sin preset. |
+| **Hummingbird** | incluido | core PrestaShop | ✅ 200 | n/a | La flag `--hummingbird-build` se encarga del compile de assets. |
+| **Falcon** | 3.1.2 | Leo Themes (2023, comercial) | ⚠ 500 | n/a | El tema apunta a PS 8.x. La incompatibilidad con PS 9.1 emerge tras el deploy — ver el caveat abajo. |
+
+Para el smoke baseline se usó `pslando create -y --no-install-modules`; la columna de módulos refleja lo que reporta `pslando install-modules` en una pasada explícita posterior.
+
+### Caveat — temas que apuntan a PS 8.x
+
+El "manifest de compatibilidad" dentro del zip de un tema (`config/theme.yml` `compatibility.from`/`to`, o el nodo XML legacy `<ps_versions_compliancy>`) es **orientativo, no definitivo**. Falcon 3.1.2 declara `compatibility.from: 8.0.0` pero sus templates dependen de internals de Smarty 3 / Symfony 4 que PrestaShop 9.1 eliminó — el tema se despliega limpio y el front devuelve 500.
+
+Si tu proyecto apunta a PS 9.x, prioriza temas publicados o actualizados desde 2024. Para temas más antiguos, fija PS 8.2 en `pslando.config.json`:
+
+```json
+{
+  "schema": 1,
+  "psVersion": "8.2.5",
+  "theme": "falcon"
+}
+```
+
+O override por ejecución: `pslando create --ps-version=8.2.5 --theme=falcon`.
+
+## Temas con sources `_dev/`
+
+Algunos temas incluyen una carpeta `_dev/` (o `dev/`) con sources de Sass/JS/TS que hay que compilar antes de que el front renderice. El `themes/<name>/assets/` desplegado queda vacío hasta que ejecutas el build del tema.
+
+| Tema | Comando de build |
+|---|---|
+| **Hummingbird** | `pslando create --hummingbird-build` (gestionado automáticamente vía un contenedor `node:20` efímero) |
+| **Cualquier otro** | Manual, tras `pslando create`: <br/> `cd themes/<name>/_dev && npm install && npm run build` |
+
+Hummingbird es el único tema con un atajo integrado. Para Falcon, Panda v3+ y otros temas custom que traigan un árbol `_dev/`, ejecuta el comando manual desde dentro del sandbox una vez `pslando create` termina:
+
+```bash
+cd themes/<theme-name>/_dev
+npm install     # o pnpm / yarn según el lockfile del tema
+npm run build   # produce themes/<name>/assets/
+```
+
+Si el tema apunta a una versión de Node distinta a la 20, ejecuta dentro de un contenedor efímero:
+
+```bash
+docker run --rm -v "$PWD/themes/<theme-name>/_dev":/app -w /app node:18 \
+  bash -c "npm install && npm run build"
+```
+
+## Lo que `pslando create` NO hace
+
+- **Ejecutar el build del tema automáticamente** (excepto Hummingbird vía la flag explícita). Los builds son específicos de cada tema y no queremos efectos colaterales sorpresa.
+- **Validar el cumplimiento de versión de PS en runtime.** `pslando` valida `<ps_versions_compliancy>` contra la versión de PS elegida y avisa; con `--strict-compat` bloquea. Pero los mismatches manifest-vs-realidad (estilo Falcon) solo afloran al cargar la primera página del front.
+
+## Reportar un tema
+
+Si has probado un tema con `pslando` y quieres añadirlo aquí, abre un issue con:
+
+- Nombre + versión + origen del tema (comercial / open-source / custom).
+- Versión de PS testeada.
+- Status HTTP del front.
+- Versión de `pslando` (`pslando --version`).
+- Pasos extra que hayas necesitado (comandos de build, ediciones manuales, exclusiones de módulos).
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Migración desde 0.x" href="/docs/kb/migrating-from-0.x" description="Guía paso a paso del upgrade." />
+  <Card title="Schema drift PS 8 → 9" href="/docs/kb/schema-drift-ps-8-9" description="Qué cambia entre versiones mayores de PS." />
+  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="El nuevo flujo multiselect + --exclude." />
+</Cards>
