@@ -1,0 +1,163 @@
+---
+title: Presets
+description: Presets panda + none incluidos, y cómo escribir un preset local.
+---
+
+Un **preset** es un pequeño objeto TypeScript que conecta comportamiento específico de un tema en el resolver de `ps-lando` — filtros de grupo de módulos, ajustes de orden de instalación, alias de nombre de tema, hooks post-install. Los presets mantienen el core de la CLI agnóstico al tema.
+
+`ps-lando` incluye dos presets (`panda`, `none`) y soporta cargar presets locales desde disco.
+
+## Presets incluidos
+
+### `panda`
+
+Se carga automáticamente cuando `ps-lando` detecta un `panda*.zip` en el cwd. Codifica todo lo que ps-lando hacía pre-1.0 para Panda + Easy Builder.
+
+| Propiedad | Valor |
+|---|---|
+| `id` | `panda` |
+| Trigger | Un zip cuyo `theme.yml` `<name>` matchea `^panda$` |
+| Filtros de grupo | `blog`, `easybuilder`, `social`, `marketing` (ver [Selección de módulos](/docs/guides/selecting-modules)) |
+| Orden de módulos | Orden tipo `stblog_parent` para los módulos de blog; bridge de Easy Builder instalado tras el editor |
+| Alias de tema | `panda`, `panda-theme`, `Panda2` (match de prefijo case-insensitive) |
+| Zips compañeros | `steasybuilder.zip`, `steasy_trans_panda.zip` (auto-clasificados como módulos del preset panda) |
+
+Desactívalo explícitamente con `--no-preset` o `presets: []`. Fuérzalo en un proyecto no-panda con `--preset=panda`.
+
+### `none`
+
+Un preset no-op. Útil cuando quieres descartar la auto-detección sin desactivar presets del todo:
+
+```bash
+ps-lando create --preset=none
+```
+
+Equivalente a `--no-preset` por ahora, pero reservado para semántica futura de "no-op explícito".
+
+## Cómo se resuelven los presets
+
+El resolver elige presets en este orden (mayor prioridad primero):
+
+1. **CLI** — `--preset=<name>` (repetible). `--no-preset` corta.
+2. **Archivo de config** — `presets: ["panda", "./presets/spain.ts"]`.
+3. **Auto-detect** — basado en zips detectados (`panda*.zip` → `panda`).
+
+Cada entrada se resuelve así:
+- `"panda"` / `"none"` → preset incluido.
+- `"./presets/foo.ts"` (empieza por `./` o `/`) → preset local, cargado vía `jiti`.
+- Cualquier otra cosa → se busca en los directorios de `presetsSearchPath`.
+
+Preset irresoluble → exit 67 (`PresetNotFound`).
+
+## Escribir un preset local
+
+Un preset es un único archivo TypeScript / JavaScript que exporta un objeto `Preset`:
+
+```ts
+// ./presets/spain.ts
+import type { Preset, DetectContext, PresetMatch } from "ps-lando";
+
+const spain: Preset = {
+  id: "spain",
+
+  match(ctx: DetectContext): PresetMatch | null {
+    // Opcional: este preset solo se activa si el cwd contiene un sentinel "spain.json".
+    if (!ctx.cwdFiles.includes("spain.json")) return null;
+    return { confidence: "high", reason: "sentinel spain.json detectado" };
+  },
+
+  // Aplica filtros de grupo o ajustes a nivel módulo.
+  modulesExclude: [
+    "stblog*",         // tienda española, sin blog
+  ],
+
+  // Corre tras install-modules, antes del smoke test.
+  initHooks: [
+    {
+      name: "spain-taxes",
+      run: ({ projectDir, lando }) => lando(["mysql", "-e", "/* IVA 21/10/4 SQL */"]),
+    },
+  ],
+};
+
+export default spain;
+```
+
+Referénciale desde config:
+
+```json
+{
+  "schema": 1,
+  "presets": ["./presets/spain.ts"],
+  "presetsSearchPath": ["./presets"]
+}
+```
+
+…o desde la CLI:
+
+```bash
+ps-lando create --preset=./presets/spain.ts
+```
+
+### Tipos
+
+```ts
+export interface Preset {
+  id: string;
+  match?(ctx: DetectContext): PresetMatch | null;
+
+  // Filtros de módulos que se fusionan en modules.exclude / modules.only al resolver.
+  modulesExclude?: string[];
+  modulesOnly?:    string[];
+
+  // Pistas de orden de instalación.
+  installAfter?: Record<string, string[]>;
+
+  // Alias opcionales del tema (match de prefijo case-insensitive).
+  themeAliases?: string[];
+
+  // Hooks inyectados en init-scripts/ y post-scripts/ al resolver.
+  initHooks?: PresetHook[];
+  postHooks?: PresetHook[];
+}
+
+export interface PresetMatch {
+  confidence: "high" | "medium" | "low";
+  reason: string;
+}
+
+export interface DetectContext {
+  cwd: string;
+  cwdFiles: string[];        // basenames del cwd (ya filtrado a *.zip + .pslando.config.*)
+  detectedZips: ZipClassification[];
+  projectName: string;
+}
+```
+
+La superficie de tipos completa vive en `node_modules/ps-lando/dist/presets/types.d.ts` una vez instalado `ps-lando`.
+
+## Aviso de seguridad
+
+<Callout type="warn">
+**Los presets locales ejecutan código arbitrario.** Un preset es un módulo TS/JS regular — sus funciones `match()` y `run()` corren con los mismos privilegios que `ps-lando`. Nunca cargues un preset de una fuente no confiable.
+
+`ps-lando` no sandboxea la ejecución de presets. Si aceptas presets vía `--preset=<path>` desde inputs de CI o paquetes de terceros, audita el código primero.
+
+Los presets incluidos (`panda`, `none`) viajan con el paquete npm y se revisan en el repo.
+</Callout>
+
+## Listar presets disponibles
+
+```bash
+ps-lando list presets
+```
+
+Lista los presets incluidos más cualquier cosa resoluble desde `presetsSearchPath`. Útil para descubrir qué `--preset=<name>` aceptará.
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Referencia de config" href="/docs/reference/config" description="Esquema completo de pslando.config.json." />
+  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="Cuándo usar --exclude vs --only." />
+  <Card title="Hooks y recipes" href="/docs/guides/hooks-and-recipes" description="Los hooks inyectados por preset conviven con los hooks de tu proyecto." />
+</Cards>
