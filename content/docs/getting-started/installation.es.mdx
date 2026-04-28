@@ -18,17 +18,43 @@ description: Requisitos previos, plataformas soportadas y qué esperar en la pri
 Si tienes OrbStack instalado, igual necesitas Docker Desktop **instalado** (no hace falta que esté arrancado) para que `/Applications/Docker.app` exista en disco. La comprobación de motor de Lando falla si no. Mira [lando/core#138](https://github.com/lando/core/issues/138).
 </Callout>
 
-## Zips de SunnyToo
+## Suelta cualquier zip de tema
 
-Descárgalos una vez desde tu cuenta de cliente de SunnyToo y guárdalos en un sitio duradero (p. ej. `~/Documents/sunnytoo-assets/`). Cada desarrollador usa su propia licencia — sin infraestructura compartida, sin zonas grises de licenciamiento.
+Desde **1.0.0**, `ps-lando` es **zero-config**: suelta cualquier zip de tema de PrestaShop en una carpeta, ejecuta `ps-lando create` y la CLI lo auto-detecta vía `theme.yml` (o el legacy `config.xml`). Ya no necesitas un binario específico para Panda ni la flag `--panda`.
 
-| Archivo | Qué es | ¿Obligatorio? |
+| Patrón | Qué es | ¿Obligatorio? |
 |---|---|---|
-| `panda.zip` (o `panda-theme.zip`) | El bundle del tema Panda. | Sí — para instalar Panda. |
-| `steasybuilder.zip` | Módulo del editor visual Easy Builder. | Solo si tienes licencia de Easy Builder. |
-| `steasy_trans_panda.zip` | Puente Easy Builder ↔ Panda. | Solo si tienes `steasybuilder.zip` — no sirve de nada solo. |
+| `*.zip` con `config/theme.yml` | Cualquier zip de tema de PrestaShop. | Sí — al menos un zip de tema (o `--theme=none`). |
+| `st*.zip` / `module-*.zip` | Zips de módulos. | Opcional — se copian/instalan si están presentes. |
 
-La CLI hace coincidencia de prefijo case-insensitive, así que cualquiera de `panda.zip`, `panda-theme.zip`, `Panda2.zip`, `easybuilder.zip`, `steasy-builder.zip`, etc. es aceptado. Usa una carpeta limpia por proyecto para evitar sorpresas si tienes varios archivos coincidentes.
+La CLI escanea el cwd (o `--zips=<dir>`) y clasifica cada `*.zip` como tema / módulo / desconocido. Los temas se eligen por el `name` de `theme.yml`; los módulos por `<name>/<name>.php` o `<name>/config.xml` en la raíz del zip. Case-insensitive en todo.
+
+### Preset incluido `panda`
+
+Cuando `ps-lando` detecta un `panda*.zip` carga automáticamente el **preset panda** incluido — el mismo comportamiento Panda + Easy Builder que los usuarios pre-1.0 tenían hard-codeado. El preset añade `steasybuilder` + `steasy_trans_panda` como filtros de grupo conocidos y conecta el puente Easy Builder ↔ Panda. Desactívalo con `--no-preset` o `presets: []` en config; fuerza otro con `--preset=<name>`.
+
+| Preset | Se carga cuando | Qué hace |
+|---|---|---|
+| `panda` (incluido) | `panda*.zip` se detecta en cwd | Añade el puente Easy Builder, filtros de grupo (`blog`, `easybuilder`, `social`, `marketing`), orden tipo `stblog_parent`. |
+| `none` (incluido) | Nunca (solo explícito) | No-op — útil para `--preset=none` y descartar sin `--no-preset`. |
+
+Ver [Referencia → Presets](/docs/reference/presets) para escribir presets locales.
+
+### Opcional: `pslando.config.json`
+
+Zero-config es lo por defecto. Si quieres comportamiento explícito y repetible (CI, subcarpetas de monorepo, drops multi-tema), ejecuta `ps-lando init` para generar un `pslando.config.json`:
+
+```bash
+ps-lando init           # interactivo (clack), 7 prompts
+ps-lando init --yes     # escribe defaults, sin prompts
+ps-lando init --force   # sobrescribe config existente
+```
+
+El asistente init escribe `pslando.config.json`, un `init-scripts/01-example.sh` de ejemplo y añade `.pslando-cache.json` a tu `.gitignore`. Ver [Referencia → Config](/docs/reference/config) para el esquema completo.
+
+<Callout type="info">
+¿Migrando desde 0.6.x? Mira la guía [Migración desde 0.x](/docs/kb/migrating-from-0.x). Las flags `--skip-easybuilder`, `--skip-blog`, `--skip-social` y `--skip-marketing` se eliminaron en 1.0.0 — reemplazadas por la flag genérica `--exclude=<glob>`.
+</Callout>
 
 ## macOS
 

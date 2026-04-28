@@ -18,17 +18,43 @@ description: Prerequisites, supported platforms, and what to expect on a first r
 If you have OrbStack installed, you still need Docker Desktop **installed** (it doesn't have to be running) so that `/Applications/Docker.app` exists on disk. Lando's engine check otherwise fails. See [lando/core#138](https://github.com/lando/core/issues/138).
 </Callout>
 
-## SunnyToo zips
+## Drop any theme zip
 
-Download these once from your SunnyToo customer account and keep them somewhere durable (e.g. `~/Documents/sunnytoo-assets/`). Each developer uses their own license — no shared infra, no licensing gray area.
+Since **1.0.0**, `ps-lando` is **zero-config**: drop any PrestaShop theme zip into a folder, run `ps-lando create`, and the CLI auto-detects the theme via `theme.yml` (or legacy `config.xml`). You no longer need a theme-specific binary or a `--panda` flag.
 
-| File | What it is | Required? |
+| File pattern | What it is | Required? |
 |---|---|---|
-| `panda.zip` (or `panda-theme.zip`) | The Panda theme bundle. | Yes — to install Panda. |
-| `steasybuilder.zip` | Easy Builder visual editor module. | Only if you licensed Easy Builder. |
-| `steasy_trans_panda.zip` | Easy Builder ↔ Panda bridge. | Only if you have `steasybuilder.zip` — useless alone. |
+| `*.zip` containing `config/theme.yml` | Any PrestaShop theme zip. | Yes — at least one theme zip (or `--theme=none`). |
+| `st*.zip` / `module-*.zip` | PrestaShop module zips. | Optional — copied/installed if present. |
 
-The CLI does case-insensitive prefix matching, so any of `panda.zip`, `panda-theme.zip`, `Panda2.zip`, `easybuilder.zip`, `steasy-builder.zip`, etc. are accepted. Use a clean folder per project to avoid surprises if you have multiple matching files.
+The CLI scans the cwd (or `--zips=<dir>`) and classifies every `*.zip` as theme / module / unknown. Themes are picked by `theme.yml` `name`; modules by `<name>/<name>.php` or `<name>/config.xml` at the zip root. Case-insensitive everywhere.
+
+### Bundled `panda` preset
+
+When `ps-lando` detects a `panda*.zip` it auto-loads the bundled **panda preset** — the same Panda + Easy Builder behavior pre-1.0 users had hard-coded. The preset adds `steasybuilder` + `steasy_trans_panda` as known group filters and wires the Easy Builder ↔ Panda bridge. Disable with `--no-preset` or `presets: []` in config; force a different preset with `--preset=<name>`.
+
+| Preset | Auto-loads when | What it does |
+|---|---|---|
+| `panda` (bundled) | `panda*.zip` is detected in cwd | Adds Easy Builder bridge, group filters (`blog`, `easybuilder`, `social`, `marketing`), `stblog_parent`-style ordering. |
+| `none` (bundled) | Never (explicit only) | No-op — useful for `--preset=none` to opt out without `--no-preset`. |
+
+See [Reference → Presets](/docs/reference/presets) for authoring local presets.
+
+### Optional: `pslando.config.json`
+
+Zero-config is the default. If you want explicit, repeatable behavior (CI, monorepo subfolders, multi-theme drops), run `ps-lando init` to generate a `pslando.config.json`:
+
+```bash
+ps-lando init           # interactive (clack), 7 prompts
+ps-lando init --yes     # write defaults, no prompts
+ps-lando init --force   # overwrite existing config
+```
+
+The init wizard writes `pslando.config.json`, an example `init-scripts/01-example.sh`, and appends `.pslando-cache.json` to your `.gitignore`. See [Reference → Config](/docs/reference/config) for the full schema.
+
+<Callout type="info">
+Migrating from 0.6.x? See the [Migrating from 0.x](/docs/kb/migrating-from-0.x) guide. The `--skip-easybuilder`, `--skip-blog`, `--skip-social`, and `--skip-marketing` flags were removed in 1.0.0 — replaced by the generic `--exclude=<glob>` flag.
+</Callout>
 
 ## macOS
 
