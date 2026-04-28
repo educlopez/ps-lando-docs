@@ -8,8 +8,22 @@ description: Step-by-step guide for upgrading existing ps-lando projects from 0.
 Most teams finish this migration in under 10 minutes. The CI script update is the most likely place to need a tweak.
 
 <Callout type="info">
-**TL;DR:** the runtime UX is unchanged for the default case (`ps-lando create -y` in a folder with `panda.zip` still works the same way). What changed: removed `--skip-*` flags, optional `pslando.config.json`, new `init` and `cache clear` commands, expanded hook env vars.
+**TL;DR:** the runtime UX is unchanged for the default case (`ps-lando create -y` in a folder with `panda.zip` still works the same way). What changed: removed `--skip-*` flags, optional `pslando.config.json`, new `init` and `cache clear` commands, expanded hook env vars, and explicit theme + module **prompts** when you don't pass `-y`.
 </Callout>
+
+## What's actually new in v1
+
+If you've been on 0.6.x and only run `ps-lando create -y`, **nothing about the default Panda flow changed for you** — same selections, same Panda + Easy Builder sandbox, same byte-equivalent extraction.
+
+What did change:
+
+1. **Theme-agnostic.** Drop a Falcon, Leo Classic, Hummingbird, custom — any zip with `config/theme.{yml,xml}` — and `ps-lando create` deploys it. The `--panda` flag is gone (and never existed as a public flag in 0.6 — it was hard-coded). See [Theme compatibility matrix](/docs/kb/theme-compatibility) for what we've validated.
+2. **Explicit prompts when you don't pass `-y`.** A `select` prompt for the theme (or `None`), and a `multiselect` for the modules (everything pre-checked). With `-y` everything auto-selects to match the v0.6 default.
+3. **Preset bound by selected theme name.** Pick a theme called `panda` in the prompt → bundled `panda` preset activates. Pick anything else → no preset binds (use `--preset=<name>` to force one).
+4. **Module multiselect, not group flags.** Group filters (`--skip-*`) were replaced by the multiselect prompt + `--exclude=<glob>` / `--only=<glob>` for CI.
+5. **Optional `pslando.config.json`.** `ps-lando init` generates one if you want repeatable, explicit behavior in CI / monorepos.
+
+None of these break a 0.6.x `-y` script. All of them are visible only when you go interactive (drop `-y`).
 
 ## Step 1 — Update the CLI
 
@@ -154,7 +168,8 @@ The 0.6.0 tarball stays on npm forever and reads the v1-shaped `.ps-lando.json` 
 ## Next steps
 
 <Cards>
-  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="The new --exclude / --only flow." />
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="The new multiselect + --exclude / --only flow." />
+  <Card title="Theme compatibility" href="/docs/kb/theme-compatibility" description="Validated themes and PS 9 caveats." />
   <Card title="Config reference" href="/docs/reference/config" description="The full pslando.config.json schema." />
   <Card title="Flags reference" href="/docs/reference/flags" description="All v1 flags + exit codes." />
 </Cards>

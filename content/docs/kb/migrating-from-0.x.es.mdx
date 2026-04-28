@@ -8,8 +8,22 @@ description: Guía paso a paso para actualizar proyectos ps-lando existentes de 
 La mayoría de equipos terminan esta migración en menos de 10 minutos. El sitio donde más probablemente toques algo es en el script de CI.
 
 <Callout type="info">
-**TL;DR:** la UX en runtime no cambia para el caso por defecto (`ps-lando create -y` en una carpeta con `panda.zip` sigue funcionando igual). Lo que cambió: flags `--skip-*` eliminadas, `pslando.config.json` opcional, comandos nuevos `init` y `cache clear`, set ampliado de env vars en hooks.
+**TL;DR:** la UX en runtime no cambia para el caso por defecto (`ps-lando create -y` en una carpeta con `panda.zip` sigue funcionando igual). Lo que cambió: flags `--skip-*` eliminadas, `pslando.config.json` opcional, comandos nuevos `init` y `cache clear`, set ampliado de env vars en hooks, y **prompts** explícitos de tema + módulos cuando no pasas `-y`.
 </Callout>
+
+## Qué hay realmente nuevo en v1
+
+Si vienes de 0.6.x y solo ejecutas `ps-lando create -y`, **nada del flujo Panda por defecto cambia para ti** — mismas selecciones, mismo sandbox Panda + Easy Builder, misma extracción byte-equivalente.
+
+Lo que sí cambió:
+
+1. **Theme-agnostic.** Suelta un Falcon, Leo Classic, Hummingbird, custom — cualquier zip con `config/theme.{yml,xml}` — y `ps-lando create` lo despliega. La flag `--panda` ya no existe (y en 0.6 nunca fue una flag pública — estaba hardcoded). Mira la [Matriz de compatibilidad de temas](/docs/kb/theme-compatibility) para ver qué hemos validado.
+2. **Prompts explícitos cuando no pasas `-y`.** Un prompt `select` para el tema (o `None`) y un `multiselect` para los módulos (todo pre-marcado). Con `-y` se auto-selecciona todo para que coincida con el default de v0.6.
+3. **Preset vinculado al nombre del tema seleccionado.** Elige un tema llamado `panda` en el prompt → se activa el preset `panda` incluido. Elige cualquier otro → no se vincula ningún preset (usa `--preset=<name>` para forzar uno).
+4. **Multiselect de módulos, no flags de grupo.** Los filtros de grupo (`--skip-*`) se reemplazaron por el prompt multiselect + `--exclude=<glob>` / `--only=<glob>` para CI.
+5. **`pslando.config.json` opcional.** `ps-lando init` genera uno si quieres comportamiento repetible y explícito en CI / monorepos.
+
+Ninguno de estos cambios rompe un script `-y` de 0.6.x. Todos son visibles solo cuando vas en interactivo (sin `-y`).
 
 ## Paso 1 — Actualiza la CLI
 
@@ -154,7 +168,8 @@ El tarball 0.6.0 vive en npm para siempre y lee el `.ps-lando.json` con shape v1
 ## Siguientes pasos
 
 <Cards>
-  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="El nuevo flujo --exclude / --only." />
+  <Card title="Selección de módulos" href="/docs/guides/selecting-modules" description="El nuevo flujo multiselect + --exclude / --only." />
+  <Card title="Compatibilidad de temas" href="/docs/kb/theme-compatibility" description="Temas validados y caveats de PS 9." />
   <Card title="Referencia de config" href="/docs/reference/config" description="Esquema completo de pslando.config.json." />
   <Card title="Referencia de flags" href="/docs/reference/flags" description="Todas las flags v1 + exit codes." />
 </Cards>
