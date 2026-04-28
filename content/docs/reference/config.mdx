@@ -1,0 +1,189 @@
+---
+title: Config
+description: The pslando.config.{json,ts,js} schema, discovery rules, and precedence.
+---
+
+`pslando.config.{json,ts,js}` is **optional**. `ps-lando` v1.0 is zero-config — drop zips into a folder, run `ps-lando create`, and it works. Use a config file when you want explicit behavior (CI, monorepo subfolders, multi-theme drops, repeatable presets).
+
+Generate one with `ps-lando init` (interactive, 7 prompts) or write it by hand. Validation is enforced via `zod` — invalid configs exit `65` (`SchemaValidationError`) with a path-pointing error.
+
+## Discovery (cosmiconfig)
+
+`ps-lando` walks up from the cwd to the first `.git` ancestor (or filesystem root) looking for any of:
+
+| Filename | Notes |
+|---|---|
+| `pslando.config.ts` | Loaded via `jiti` (lazy import — TypeScript supported). |
+| `pslando.config.js` | ESM or CJS. |
+| `pslando.config.json` | Plain JSON. Default for `ps-lando init`. |
+| `package.json#pslando` | Inline under a `pslando` key. |
+
+Within one directory the precedence is `.ts` > `.js` > `.json` > `package.json#pslando` (first match wins).
+
+Override discovery with `--config=<path>`. Missing path exits 66 (`ConfigNotFound`).
+
+## Precedence (5 layers)
+
+The resolved plan is a 5-layer merge — **CLI flags always win**. Highest priority first:
+
+1. **CLI flags** — e.g. `--theme=falcon`, `--exclude=stblog*`.
+2. **Environment variables** — e.g. `PSLANDO_LOG_FORMAT=json`.
+3. **Config file** — `pslando.config.*` (resolved via cosmiconfig or `--config=`).
+4. **Preset defaults** — bundled (`panda`, `none`) or local (`./presets/foo.ts`).
+5. **Built-in defaults** — `theme: auto`, `presets: auto-detect`, etc.
+
+Resolved decisions are emitted to stderr (text or JSON, see `--log-format`).
+
+## Schema (canonical)
+
+```ts
+import { z } from "zod";
+
+const ThemeInputSchema = z.union([
+  z.literal("auto"),
+  z.literal("none"),
+  z.string(),                                // theme name or .zip path
+]);
+
+const PsLandoConfigSchema = z.object({
+  schema: z.literal(1).default(1),
+
+  theme: ThemeInputSchema.optional(),
+
+  modules: z.object({
+    include: z.array(z.string()).default([]),
+    exclude: z.array(z.string()).default([]),
+    only:    z.array(z.string()).default([]),
+  }).default({}),
+
+  // Shorthand — merged into modules.exclude on load (config-level only).
+  // CLI --exclude is independent and wins.
+  exclude: z.array(z.string()).default([]),
+
+  presets: z.array(z.string()).optional(),         // omitted = auto-detect; [] = opt-out; ["panda"] = explicit
+  presetsSearchPath: z.array(z.string()).default([]),
+
+  hooks: z.object({
+    initScriptsDir: z.string().default("./init-scripts"),
+    postScriptsDir: z.string().default("./post-scripts"),
+    onFailure: z.enum(["continue", "fail"]).default("continue"),
+  }).default({}),
+
+  cache: z.object({
+    file: z.string().default(".pslando-cache.json"),
+    enabled: z.boolean().default(true),
+  }).default({}),
+
+  log: z.object({
+    format: z.enum(["text", "json"]).default("text"),
+  }).default({}),
+}).strict();                                       // unknown top-level keys → exit 65
+
+export type PsLandoConfig = z.infer<typeof PsLandoConfigSchema>;
+```
+
+**Loader rules:**
+- Discovery walks up from cwd to first `.git` ancestor or filesystem root.
+- File precedence within one directory: `.ts` > `.js` > `.json` > `package.json#pslando`.
+- TS configs loaded via `jiti` (lazy — only when a `.ts`/`.js` config is present).
+- `--config=<path>` short-circuits discovery.
+- Top-level `exclude` shorthand merges into `modules.exclude` BEFORE CLI flags apply.
+
+## Examples
+
+### Minimal — explicit theme + opt-in panda preset
+
+```json
+{
+  "schema": 1,
+  "theme": "panda",
+  "presets": ["panda"]
+}
+```
+
+### Multi-exclude with shorthand
+
+```json
+{
+  "schema": 1,
+  "exclude": ["stblog*", "steasybuilder*"]
+}
+```
+
+…which loads as:
+
+```json
+{
+  "schema": 1,
+  "modules": { "exclude": ["stblog*", "steasybuilder*"] }
+}
+```
+
+### Pin all module-selection knobs
+
+```json
+{
+  "schema": 1,
+  "theme": "falcon",
+  "presets": [],
+  "modules": {
+    "include": [],
+    "exclude": ["stblog*"],
+    "only":    ["stmegamenu", "stbanner"]
+  }
+}
+```
+
+### TypeScript config with type checks
+
+```ts
+// pslando.config.ts
+import type { PsLandoConfig } from "ps-lando";
+
+const config: PsLandoConfig = {
+  schema: 1,
+  theme: "panda",
+  presets: ["panda", "./presets/spain.ts"],
+  presetsSearchPath: ["./presets"],
+  exclude: ["stblog*"],
+  hooks: {
+    initScriptsDir: "./bootstrap",
+    postScriptsDir: "./post",
+    onFailure: "fail",
+  },
+};
+
+export default config;
+```
+
+### `package.json#pslando`
+
+```json
+{
+  "name": "my-shop",
+  "pslando": {
+    "schema": 1,
+    "theme": "panda",
+    "exclude": ["stblog*"]
+  }
+}
+```
+
+## Validation behavior
+
+- Unknown top-level keys → exit 65 (`SchemaValidationError`).
+- Type mismatch (e.g. `theme: 123`) → exit 65 with the offending path in the error message.
+- `--config=<missing>` → exit 66 (`ConfigNotFound`).
+- `--preset=<unknown>` (or config `presets: ["unknown"]`) → exit 67 (`PresetNotFound`).
+
+## Migration from 0.x `.ps-lando.json`
+
+The legacy `.ps-lando.json` file (auto-written by `ps-lando create` since 0.6.0) is auto-lifted to the v1 shape on the first write. Both shapes are read tolerantly. See the [Migrating from 0.x](/docs/kb/migrating-from-0.x) guide for the field-by-field mapping.
+
+## Next steps
+
+<Cards>
+  <Card title="Flags reference" href="/docs/reference/flags" description="All v1 CLI flags + exit codes." />
+  <Card title="Presets reference" href="/docs/reference/presets" description="Bundled panda + none presets, and how to author local ones." />
+  <Card title="Selecting modules" href="/docs/guides/selecting-modules" description="When to use --exclude vs --only." />
+</Cards>
