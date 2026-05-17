@@ -2,6 +2,7 @@
   "name": "ps-lando-docs",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.1.2",
   "description": "Documentation site for ps-lando",
   "scripts": {
     "build": "next build",
@@ -28,5 +29,14 @@
     "postcss": "^8.5.10",
     "tailwindcss": "^4.2.4",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "msw",
+      "unrs-resolver",
+      "@tailwindcss/oxide"
+    ]
   }
 }
