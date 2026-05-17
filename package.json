@@ -2,6 +2,7 @@
   "name": "ps-lando-docs",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.1.2",
   "description": "Documentation site for ps-lando",
   "scripts": {
     "build": "next build",
