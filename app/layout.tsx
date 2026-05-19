@@ -1,6 +1,7 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '@vercel/analytics/next';
 import {
   appName,
   author,
@@ -99,6 +100,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
     >
       <body className="flex flex-col min-h-screen font-sans antialiased">
         <RootProvider>{children}</RootProvider>
+        <Analytics />
       </body>
     </html>
   );
