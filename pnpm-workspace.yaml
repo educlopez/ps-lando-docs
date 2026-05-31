@@ -1,3 +1,9 @@
 allowBuilds:
   esbuild: true
   sharp: true
+
+# SECURITY: supply-chain hardening (npm-security-best-practices)
+minimumReleaseAge: 2880
+minimumReleaseAgeExclude:
+  - "@educlopez/*"
+blockExoticSubdeps: true
