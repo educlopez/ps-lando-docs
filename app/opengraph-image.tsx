@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { appName, tagline } from '@/lib/shared';
+import { appName, siteUrl, tagline } from '@/lib/shared';
 
 export const alt = `${appName} — ${tagline}`;
 export const size = { width: 1200, height: 630 };
@@ -85,7 +85,7 @@ export default function OpengraphImage() {
           }}
         >
           <span>$ npx ps-lando init</span>
-          <span>ps-lando-docs.vercel.app</span>
+          <span>{new URL(siteUrl).host}</span>
         </div>
       </div>
     ),

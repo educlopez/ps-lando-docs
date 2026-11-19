@@ -55,11 +55,30 @@ export async function generateMetadata(
   const page = source.getPage(params.slug, params.lang);
   if (!page) notFound();
 
+  const image = getPageImage(page).url;
+  // Without its own `alternates`, a docs page inherits the [lang] layout's
+  // canonical and hreflang, which point at the home page.
+  const en = source.getPage(params.slug, 'en')?.url;
+  const es = source.getPage(params.slug, 'es')?.url;
+  const languages: Record<string, string> = {};
+  if (en) languages.en = en;
+  if (es) languages.es = es;
+  if (en) languages['x-default'] = en;
   return {
     title: page.data.title,
     description: page.data.description,
+    alternates: { canonical: page.url, languages },
     openGraph: {
-      images: getPageImage(page).url,
+      title: page.data.title,
+      description: page.data.description,
+      url: page.url,
+      images: image,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: page.data.title,
+      description: page.data.description,
+      images: image,
     },
   };
 }

@@ -2,7 +2,7 @@
 
 Documentation site for [`ps-lando`](https://github.com/educlopez/ps-lando) — the CLI for spinning up PrestaShop + Panda + Easy Builder sandboxes locally.
 
-Live: _coming soon_
+Live: <https://ps-lando.educalvolopez.com>
 
 ## Stack
 

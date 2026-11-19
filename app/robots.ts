@@ -7,7 +7,9 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/og/'],
+        // /og/ stays crawlable: link-preview bots (X, LinkedIn, Slack) honour
+        // robots.txt and would skip the per-doc og:image under /og/docs/.
+        disallow: ['/api/'],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
