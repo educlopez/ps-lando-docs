@@ -18,7 +18,7 @@ const localeMeta: Record<Locale, { title: string; description: string; ogLocale:
   es: {
     title: `${appName} — Sandboxes locales de PrestaShop en 6 minutos`,
     description:
-      'Levanta sandboxes locales de PrestaShop 8 y 9 en 6 minutos con ps-lando — un CLI basado en Lando. Hooks, recipes, reset/dump/restore de DB, tema y módulos listos.',
+      'Levanta sandboxes locales de PrestaShop 8 y 9 en 6 minutos con ps-lando, un CLI basado en Lando: hooks, recipes, reset/dump/restore de DB, tema y módulos.',
     ogLocale: 'es_ES',
   },
 };
@@ -33,7 +33,9 @@ export async function generateMetadata(
   const path = lang === 'en' ? '/' : `/${lang}`;
 
   return {
-    title: { default: meta.title, template: `%s · ${appName}` },
+    // `absolute` skips the root `%s · ps-lando` template: the home title
+    // already starts with the brand, so templating it would repeat it.
+    title: { absolute: meta.title, template: `%s · ${appName}` },
     description: meta.description,
     alternates: {
       canonical: path,
@@ -49,10 +51,14 @@ export async function generateMetadata(
       url: path,
       locale: meta.ogLocale,
       alternateLocale: lang === 'en' ? ['es_ES'] : ['en_US'],
+      // Overriding openGraph here drops the root opengraph-image, so name it.
+      images: [{ url: '/opengraph-image', width: 1200, height: 630, alt: meta.title }],
     },
     twitter: {
+      card: 'summary_large_image',
       title: meta.title,
       description: meta.description,
+      images: ['/twitter-image'],
     },
   };
 }

@@ -23,7 +23,7 @@ export const keywords = [
 ] as const;
 
 export const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ps-lando-docs.vercel.app';
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ps-lando.educalvolopez.com';
 
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
